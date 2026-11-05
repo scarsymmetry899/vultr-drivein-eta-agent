@@ -1,0 +1,115 @@
+{
+  "drive_in": "Route 66 Drive-In",
+  "city": "Austin, TX",
+  "currency": "USD",
+  "items": [
+    {
+      "sku": "classic-burger",
+      "name": "Classic Burger",
+      "description": "Smash patty, pickles, onion, mustard, ketchup, potato bun.",
+      "price_cents": 899,
+      "prep_minutes": 8,
+      "station": "grill",
+      "allergens": ["wheat", "soy", "egg"]
+    },
+    {
+      "sku": "cheeseburger",
+      "name": "Cheeseburger",
+      "description": "Classic burger with American cheese.",
+      "price_cents": 999,
+      "prep_minutes": 8,
+      "station": "grill",
+      "allergens": ["wheat", "milk", "soy", "egg"]
+    },
+    {
+      "sku": "bacon-cheeseburger",
+      "name": "Bacon Cheeseburger",
+      "description": "Cheeseburger with two strips of bacon.",
+      "price_cents": 1199,
+      "prep_minutes": 10,
+      "station": "grill",
+      "allergens": ["wheat", "milk", "soy", "egg"]
+    },
+    {
+      "sku": "veggie-burger",
+      "name": "Veggie Burger",
+      "description": "Griddled vegetable patty, lettuce, tomato, potato bun.",
+      "price_cents": 999,
+      "prep_minutes": 9,
+      "station": "grill",
+      "allergens": ["wheat", "soy"]
+    },
+    {
+      "sku": "chili-dog",
+      "name": "Chili Dog",
+      "description": "All-beef dog, beef chili, yellow mustard.",
+      "price_cents": 649,
+      "prep_minutes": 6,
+      "station": "grill",
+      "allergens": ["wheat"]
+    },
+    {
+      "sku": "fries",
+      "name": "Shoestring Fries",
+      "description": "Salted fries. Cooked in a shared fryer.",
+      "price_cents": 349,
+      "prep_minutes": 4,
+      "station": "fryer",
+      "allergens": []
+    },
+    {
+      "sku": "onion-rings",
+      "name": "Onion Rings",
+      "description": "Buttermilk-battered rings.",
+      "price_cents": 449,
+      "prep_minutes": 5,
+      "station": "fryer",
+      "allergens": ["wheat", "milk"]
+    },
+    {
+      "sku": "chocolate-shake",
+      "name": "Chocolate Shake",
+      "description": "Hand-spun chocolate shake.",
+      "price_cents": 499,
+      "prep_minutes": 3,
+      "station": "shake",
+      "allergens": ["milk"]
+    },
+    {
+      "sku": "vanilla-shake",
+      "name": "Vanilla Shake",
+      "description": "Hand-spun vanilla shake.",
+      "price_cents": 499,
+      "prep_minutes": 3,
+      "station": "shake",
+      "allergens": ["milk"]
+    },
+    {
+      "sku": "strawberry-shake",
+      "name": "Strawberry Shake",
+      "description": "Hand-spun strawberry shake.",
+      "price_cents": 529,
+      "prep_minutes": 3,
+      "station": "shake",
+      "allergens": ["milk"]
+    },
+    {
+      "sku": "root-beer-float",
+      "name": "Root Beer Float",
+      "description": "Draft root beer over a scoop of vanilla.",
+      "price_cents": 429,
+      "prep_minutes": 3,
+      "station": "shake",
+      "allergens": ["milk"]
+    },
+    {
+      "sku": "cherry-cola",
+      "name": "Cherry Cola",
+      "description": "Fountain cola with a splash of cherry.",
+      "price_cents": 249,
+      "prep_minutes": 1,
+      "station": "fountain",
+      "allergens": []
+    }
+  ]
+}

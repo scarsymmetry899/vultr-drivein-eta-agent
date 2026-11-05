@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Route 66 Drive-In — Order on the go</title>
+    <meta name="description" content="Fictional Austin drive-in. Preorder with an ETA and a car plate. The pit fires the grill so the bag is ready when you arrive." />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand">
+        <span class="shield" aria-hidden="true">66</span>
+        <div>
+          <p class="eyebrow">Austin, Texas · fictional lot</p>
+          <h1>Route 66 Drive-In</h1>
+        </div>
+      </div>
+      <nav>
+        <a href="/" aria-current="page">Order</a>
+        <a href="/kitchen.html">Kitchen</a>
+      </nav>
+    </header>
+    <p class="strip">Order on the way. We fire the grill so the bag is at the window when you roll up.</p>
+    <main class="layout">
+      <section>
+        <h2>Menu</h2>
+        <p id="hours" class="meta">Loading the window…</p>
+        <div id="menu" class="menu" aria-live="polite"></div>
+      </section>
+      <section class="ticket">
+        <h2>Your ticket</h2>
+        <form id="order-form">
+          <label for="customer_name">Name on the bag</label>
+          <input id="customer_name" name="customer_name" autocomplete="name" required maxlength="60" placeholder="Alex Rivera" />
+
+          <div class="row">
+            <div>
+              <label for="car_plate">Car plate</label>
+              <input id="car_plate" name="car_plate" required maxlength="12" placeholder="TX-4821" autocapitalize="characters" />
+            </div>
+            <div>
+              <label for="car_color">Color</label>
+              <select id="car_color" name="car_color" required>
+                <option value="">Choose</option>
+                <option>red</option>
+                <option>white</option>
+                <option>black</option>
+                <option>blue</option>
+                <option>silver</option>
+                <option>green</option>
+                <option>yellow</option>
+                <option>other</option>
+              </select>
+            </div>
+          </div>
+
+          <label for="car_model">Car (optional)</label>
+          <input id="car_model" name="car_model" maxlength="40" placeholder="Mustang" />
+
+          <label for="eta">When you'll pull in</label>
+          <input id="eta" name="eta" type="datetime-local" required />
+
+          <label for="notes">Note for the pit</label>
+          <textarea id="notes" name="notes" maxlength="200" rows="2" placeholder="No onion, please."></textarea>
+
+          <div class="actions">
+            <button type="submit">Place order</button>
+          </div>
+        </form>
+        <div id="result" class="result" hidden aria-live="polite"></div>
+      </section>
+    </main>
+    <footer>
+      <p>Fictional demo kitchen for the Vultr Agent Rush. Prices are USD. No payment is taken and the lot does not track your phone's GPS. Onion rings are 86 today.</p>
+    </footer>
+    <script type="module" src="/guest.js"></script>
+  </body>
+</html>
