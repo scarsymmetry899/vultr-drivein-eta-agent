@@ -86,6 +86,7 @@ export async function runSolver(
   input: SolveInput,
   config: AppConfig,
   spawnImpl: SpawnLike = spawn,
+  childEnv: NodeJS.ProcessEnv = sandboxChildEnv(),
 ): Promise<RunnerOutcome> {
   if (config.sandboxRunner !== "docker") {
     return {
@@ -101,6 +102,7 @@ export async function runSolver(
     JSON.stringify(input),
     spawnImpl,
     (stdout) => JSON.parse(stdout) as SolveResult,
+    childEnv,
   );
   return { result, runner: "docker", isolation: "docker", warning: null };
 }
@@ -130,6 +132,7 @@ async function runCaptured<T>(
   stdin: string,
   spawnImpl: SpawnLike,
   parse: (stdout: string) => T,
+  childEnv: NodeJS.ProcessEnv = sandboxChildEnv(),
 ): Promise<T> {
   const args = dockerRunArgs(config, command);
   return new Promise((resolve, reject) => {
@@ -152,7 +155,7 @@ async function runCaptured<T>(
     try {
       child = spawnImpl("docker", args, {
         stdio: ["pipe", "pipe", "pipe"],
-        env: sandboxChildEnv(),
+        env: childEnv,
       });
     } catch (error) {
       fail(error instanceof Error ? error.message : "Could not start docker.");

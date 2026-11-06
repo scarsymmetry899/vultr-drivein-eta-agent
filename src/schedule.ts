@@ -1,8 +1,8 @@
 import { explainDecision, parseUtterance } from "../agent/inference.ts";
 import type { Explanation, ParseResult } from "../agent/inference.ts";
 import { loadMenu } from "./menu.ts";
-import { runContainmentProbe, runSolver, SandboxUnavailableError } from "./sandbox-runner.ts";
-import type { Isolation, ProbeReport } from "./sandbox-runner.ts";
+import { runContainmentProbe, runSolver, sandboxChildEnv, SandboxUnavailableError } from "./sandbox-runner.ts";
+import type { Isolation, ProbeReport, SpawnLike } from "./sandbox-runner.ts";
 import type { AppConfig } from "./config.ts";
 import {
   activeFireWindows,
@@ -11,7 +11,7 @@ import {
   setScheduleReason,
 } from "./store.ts";
 import { trailFromSchedule } from "./decision-trail.ts";
-import { HOSTILE_DEMO_INPUT } from "../sandbox/fire-time-solver/solver.ts";
+import { HOSTILE_DEMO_INPUT, SAMPLE_INPUT } from "../sandbox/fire-time-solver/solver.ts";
 import type { SolveResult } from "../sandbox/fire-time-solver/types.ts";
 import type { DriveInOrder } from "./types.ts";
 
@@ -213,4 +213,66 @@ async function maybeParse(utterance: string | undefined): Promise<ScheduleRespon
   const menu = loadMenu().items.map((item) => ({ sku: item.sku, name: item.name }));
   const parsed = await parseUtterance(utterance.trim().slice(0, 500), menu);
   return { ...parsed, applied_to_order: false };
+}
+
+export interface FailClosedReport {
+  applicable: boolean;
+  held: boolean;
+  status: number | null;
+  scheduled: boolean;
+  in_process_fallback: boolean;
+  docker_host: string | null;
+  error: string | null;
+  note: string;
+}
+
+/** Points the docker CLI at a socket that does not exist, the same failure a stopped daemon gives. */
+export const DOCKER_DOWN_SOCKET = "unix:///run/route66-docker-down-drill.sock";
+
+/**
+ * Docker-down drill. Runs the same solver path a real schedule uses, with the docker CLI
+ * pointed at a missing daemon. Uses the sample ticket and writes no order.
+ */
+export async function runFailClosedDrill(
+  config: AppConfig,
+  spawnImpl?: SpawnLike,
+): Promise<FailClosedReport> {
+  if (config.sandboxRunner !== "docker") {
+    return {
+      applicable: false,
+      held: false,
+      status: null,
+      scheduled: false,
+      in_process_fallback: false,
+      docker_host: null,
+      error: "SANDBOX_RUNNER is inprocess. There is no sandbox to lose, so this drill proves nothing here.",
+      note: "Run it on the VM with SANDBOX_RUNNER=docker.",
+    };
+  }
+  const env = { ...sandboxChildEnv(), DOCKER_HOST: DOCKER_DOWN_SOCKET };
+  try {
+    await runSolver(SAMPLE_INPUT, config, spawnImpl, env);
+    return {
+      applicable: true,
+      held: false,
+      status: 200,
+      scheduled: true,
+      in_process_fallback: false,
+      docker_host: DOCKER_DOWN_SOCKET,
+      error: "The solver answered without a Docker daemon. Fail-closed did not hold.",
+      note: "Do not narrate this as containment.",
+    };
+  } catch (error) {
+    if (!(error instanceof SandboxUnavailableError)) throw error;
+    return {
+      applicable: true,
+      held: true,
+      status: 503,
+      scheduled: false,
+      in_process_fallback: false,
+      docker_host: DOCKER_DOWN_SOCKET,
+      error: error.message,
+      note: "A real schedule returns 503 on this error and leaves the ticket unscheduled. The solver did not run in-process.",
+    };
+  }
 }

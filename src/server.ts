@@ -4,9 +4,9 @@ import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config.ts";
 import { databaseOk } from "./db.ts";
 import { loadDotEnv } from "./env.ts";
-import { inferenceConfigured } from "../agent/inference.ts";
+import { inferenceConfigured, liveCallStatus } from "../agent/inference.ts";
 import { loadMenu } from "./menu.ts";
-import { runBoundaryProbe, runContainmentDrill, scheduleOrder } from "./schedule.ts";
+import { runBoundaryProbe, runContainmentDrill, runFailClosedDrill, scheduleOrder } from "./schedule.ts";
 import {
   createOrder,
   findOrder,
@@ -32,6 +32,7 @@ export function createApp(): express.Express {
   app.get("/api/health", (_req, res) => {
     const config = loadConfig();
     const dbOk = databaseOk();
+    const liveCall = liveCallStatus();
     res.status(dbOk ? 200 : 503).json({
       ok: dbOk,
       drive_in: config.driveIn,
@@ -43,7 +44,9 @@ export function createApp(): express.Express {
       inference_mode: config.inferenceMode,
       inference_configured: inferenceConfigured(),
       inference_endpoint: "https://api.vultrinference.com/v1",
-      live_call_verified: false,
+      live_call_verified: liveCall.verified,
+      live_call_at: liveCall.at,
+      live_call_model: liveCall.model,
       kitchen_auth: kitchenConfigured(),
     });
   });
@@ -220,6 +223,14 @@ export function createApp(): express.Express {
         verified: result.report.boundaries_held,
         report: result.report,
       });
+    }),
+  );
+
+  app.post(
+    "/api/agent/fail-closed",
+    requireKitchen,
+    asyncRoute(async (_req, res) => {
+      res.json(await runFailClosedDrill(loadConfig()));
     }),
   );
 

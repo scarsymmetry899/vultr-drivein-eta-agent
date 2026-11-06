@@ -2,7 +2,7 @@ import { randomInt, randomUUID } from "node:crypto";
 import { parseTrail, trailForEarlyArrival } from "./decision-trail.ts";
 import { ticketPrepMinutes } from "../sandbox/fire-time-solver/solver.ts";
 import { openDatabase } from "./db.ts";
-import type { AppConfig } from "./config.ts";
+import { loadConfig, type AppConfig } from "./config.ts";
 import type { DriveInOrder, NewOrderInput, OrderItem, OrderStatus, UnavailableItem } from "./types.ts";
 
 interface OrderRow {
@@ -256,6 +256,7 @@ export function markHere(id: string): DriveInOrder | undefined {
             prepMinutes: prep,
             fireAt: stamp,
             readyBy: ready,
+            timeZone: loadConfig().timezone,
           }),
         ),
         stamp,
@@ -310,6 +311,8 @@ export interface BoardCard {
   special_notes: string;
   schedule_reason: string | null;
   decision_changes: string[];
+  /** Planned fire time an early check-in replaced, if any. */
+  fire_moved_from: string | null;
 }
 
 export function kitchenBoard(config: AppConfig, now = new Date()): {
@@ -394,6 +397,7 @@ function toCard(order: DriveInOrder): BoardCard {
     special_notes: order.special_notes,
     schedule_reason: order.schedule_reason,
     decision_changes: order.decision_trail?.solver.changes ?? [],
+    fire_moved_from: order.decision_trail?.solver.previous_fire_at ?? null,
   };
 }
 

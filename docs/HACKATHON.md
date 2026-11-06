@@ -16,9 +16,10 @@ It is not a restaurant, a pilot, or an autonomous kitchen. It does not take paym
 ## What is actually true today
 
 - Public code: this repository.
-- Operator-confirmed VM: `route66-drivein-demo`, `65.20.93.98`, Ubuntu 24.04, Mumbai, 1 vCPU / 2 GB. Confirmed at commit `2d8e2dc` with health and one fictional checkout. Later commits are not confirmed on that host until [`deploy/UPDATE.md`](../deploy/UPDATE.md) is run there.
-- Inference on that VM: `INFERENCE_MODE=demo`. No live call has been verified. Health reports `live_call_verified: false` on purpose.
-- Containment video: not recorded. A laptop Docker probe is not a substitute for a recording or for a probe on the VM.
+- Operator-confirmed VM: `route66-drivein-demo`, `65.20.93.98`, Ubuntu 24.04, Mumbai, 1 vCPU / 2 GB. The operator reported containment checks passing on that VM after the decision-trail update. Later commits are live there only after [`deploy/UPDATE.md`](../deploy/UPDATE.md) is run again.
+- Inference on that VM: `INFERENCE_MODE=demo` until [Turn on live Vultr Inference](../deploy/UPDATE.md#turn-on-live-vultr-inference) passes. `npm run inference:check` is the one-command proof. Health shows `live_call_verified: true` only after an accepted live reply.
+- Containment: verified on a Docker build container on 6 Nov 2026 (probe, killed loop, Docker-down drill, real daemon stop). Re-run on the VM for the video.
+- Containment video: not recorded.
 
 ## Limits
 
@@ -31,20 +32,33 @@ It is not a restaurant, a pilot, or an autonomous kitchen. It does not take paym
 
 ## Recording script
 
-Record after the VM is on the commit you intend to show, with `SANDBOX_RUNNER=docker` and `INFERENCE_MODE=demo`. Do not put the kitchen token or the inference key on screen.
+Story in one line: a guest changes plans, the agent re-times the grill, and hostile input cannot reach the restaurant.
 
-1. Open `http://65.20.93.98:8080/` on a phone-sized window. Show the menu, add a burger, and open checkout.
-2. Set an arrival inside 11:00–22:00 Austin time. Point at the line that shows the phone time and the Austin time. Then show one arrival after 22:00 Austin and the block that refuses it.
-3. Finish a fictional ticket. On the ticket, show **How this time was set**: arrival, prep, fire, ready, the change line, and the badge that says the wording is deterministic.
-4. On the same ticket, tap **I'm at the stall** before the planned fire. Show the new line that cooking started at check-in and that the earlier fire time was replaced.
-5. Open the kitchen page. Show the token gate, then the board with the same plate in the firing lane and the change line on the card. Mark it ready, then picked up.
-6. In the VM console, run `bash scripts/containment-demo.sh`. Show `evidence/runs/<stamp>.json` with `verified: true`, `checks.network` blocked, `checks.user` nonroot, `checks.secrets` absent, `checks.filesystem` read-only, and `checks.timeout` killed. Then stop Docker and show a schedule returning 503 with the ticket left unscheduled. Start Docker again before you leave.
+Record after the VM is on the commit you intend to show, with `SANDBOX_RUNNER=docker`. Use `INFERENCE_MODE=live` only if `npm run inference:check` passed on the VM; otherwise say the wording is deterministic. Never show the kitchen token or the inference key.
 
-If step 6 fails, do not narrate it as containment. Say the probe did not hold.
+**Beat 1 — the agent decides (about 60 s)**
+
+1. Phone-sized window at `http://65.20.93.98:8080/`. Add a burger, fries and a shake. Checkout: tap an arrival slot about 40 minutes out. Point at the line that converts your time to Austin time and the lot-hours bar.
+2. Plate and car color, Review, Send order. On the ticket tap **Time the grill**.
+3. Show the fire clock and **How this time was set**: Arrival, Prep, Fire, Ready. If live, point at “Wording from Vultr Serverless Inference · <model>” and say the model wrote the sentence but the solver set the clock.
+
+**Beat 2 — the guest changes plans (about 30 s)**
+
+4. Tap **I'm at the stall** well before the fire time. The clock flips to On the grill. The Fire and Ready tiles show the old times under the new ones, and What changed reads `fire … → …, ready … → …`.
+5. Desktop window, `kitchen.html`, unlock with the token off camera. The same plate is in Firing with “Rush fire at check-in · planned …”. Mark ready, then Picked up.
+
+**Beat 3 — nothing escapes (about 60 s)**
+
+6. Kitchen System check. **Run the note filter**: REFUSED, nothing executed.
+7. **Run the sandbox probe**: each boundary answers HELD (network ENETUNREACH, writes EROFS, no key in the container), ending in `boundaries_held: true`.
+8. **Run the Docker-down drill**: FAIL-CLOSED, HTTP 503, ticket not scheduled, no in-process fallback.
+9. Optional, stronger: in the VM console `systemctl stop docker`, time a grill on a new ticket and show the 503 with the ticket still Waiting, then `systemctl start docker`. Also show `bash scripts/containment-demo.sh` printing `verified: true` and the spin loop killed with 137.
+
+If any step does not hold, do not narrate it as containment. Say what failed.
 
 ## Draft submission text
 
-Route 66 Drive-In is a fictional preorder demo for Challenge 1, Blast Radius Zero. The control plane is a Vultr Cloud Compute VM. The guest sets an arrival in America/Chicago. A Docker solver, started with no network, a read-only root, a non-root user, and memory, pid, and CPU limits, returns the grill fire time and the ready time. Those numbers are stored on the ticket. The sentence next to them is labeled as deterministic demo wording. Live Vultr Serverless Inference is wired only to `https://api.vultrinference.com/v1`, schema-checked, and unable to change the fire time. It is not turned on in the deployed environment, and a live call has not been verified. The public demo URL and the containment recording are attached by the operator after the VM update and the recording steps in this file. This is not a real restaurant and it does not process payments.
+Route 66 Drive-In is a fictional preorder demo for Challenge 1, Blast Radius Zero. The control plane is a Vultr Cloud Compute VM. The guest sets an arrival in America/Chicago. A Docker solver, started with no network, a read-only root, a non-root user, and memory, pid, and CPU limits, returns the grill fire time and the ready time. Those numbers are stored on the ticket. The sentence next to them is labeled as deterministic demo wording. Live Vultr Serverless Inference is wired only to `https://api.vultrinference.com/v1`, schema-checked, and unable to change the fire time. Whether it is turned on in the deployed environment is stated in the video and backed by `evidence/runs/inference-*.json` from `npm run inference:check` on the VM. The public demo URL and the containment recording are attached by the operator after the VM update and the recording steps in this file. This is not a real restaurant and it does not process payments.
 
 Code: this repository.
 Event: https://lablab.ai/ai-hackathons/vultr-hackathon

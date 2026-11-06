@@ -130,10 +130,16 @@ function renderCard(card, now) {
     const fill = node("div");
     fill.style.width = `${pct.toFixed(1)}%`;
     bar.append(fill);
-    article.append(bar, timesRow([
+    const times = timesRow([
       ["Fired", short(card.kitchen_start_at), ""],
       ["Ready by", short(card.ready_by), "green"],
-    ]));
+    ]);
+    if (card.fire_moved_from) {
+      const moved = node("span", "moved", "Rush fire at check-in · planned ");
+      moved.append(node("strong", "", short(card.fire_moved_from)));
+      times.append(moved);
+    }
+    article.append(bar, times);
     const button = node("button", "pit-btn", "Mark ready");
     button.type = "button";
     button.addEventListener("click", () => postStatus(card.id, "ready", button));
@@ -248,6 +254,32 @@ drillButton.addEventListener("click", async () => {
   }
 });
 
+const failButton = $("#fail-closed");
+failButton.addEventListener("click", async () => {
+  failButton.disabled = true;
+  const result = $("#fail-result");
+  result.replaceChildren(node("span", "verdict idle", "RUNNING"), node("span", "", "Asking the solver with no Docker daemon…"));
+  try {
+    const response = await kitchenFetch("/api/agent/fail-closed", { method: "POST" });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || "The drill did not run.");
+    if (!body.applicable) {
+      result.replaceChildren(node("span", "verdict idle", "N/A"), node("span", "", body.error));
+    } else if (body.held) {
+      result.replaceChildren(
+        node("span", "verdict ok", "FAIL-CLOSED"),
+        node("span", "", `HTTP ${body.status}. Ticket not scheduled. No in-process fallback. Docker said: ${String(body.error).split(";")[0].slice(0, 90)}`),
+      );
+    } else {
+      result.replaceChildren(node("span", "verdict", "DID NOT HOLD"), node("span", "", body.error));
+    }
+  } catch (error) {
+    result.replaceChildren(node("span", "verdict", "ERROR"), node("span", "", error instanceof Error ? error.message : "The drill failed."));
+  } finally {
+    failButton.disabled = false;
+  }
+});
+
 function probeRows(report) {
   return [
     ["whoami", `uid=${report.uid}${report.root ? " (root)" : " (node), no capabilities"}`, !report.root && report.uid > 0],
@@ -334,7 +366,7 @@ try {
   $("#chip-mode").textContent = status.inference_mode ?? "unknown";
   $("#chip-runner").textContent = status.runner ?? "unknown";
   const verified = status.live_call_verified === true;
-  $("#chip-live").textContent = String(verified);
+  $("#chip-live").textContent = verified && status.live_call_model ? `true · ${status.live_call_model}` : String(verified);
   $("#chip-live").className = verified ? "ok" : "warn";
 } catch {
   statusLine.textContent = "Service status did not load.";

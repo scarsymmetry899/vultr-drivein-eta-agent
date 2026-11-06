@@ -29,6 +29,8 @@ If Docker is not installed, the script exits 2 and the same file has `verified: 
 
 With `SANDBOX_RUNNER=docker`, stop Docker and send a schedule. The API returns 503 and does not invent a fire time in the API process. The ticket stays unscheduled.
 
+For the video without stopping Docker on the VM, use **Run the Docker-down drill** in the kitchen System check (`POST /api/agent/fail-closed`, kitchen token required). It runs the same solver call a schedule uses, with the docker CLI pointed at `unix:///run/route66-docker-down-drill.sock`, which does not exist. Expect `FAIL-CLOSED`, HTTP 503, ticket not scheduled, no in-process fallback. It uses the sample ticket and writes no order. In-process mode answers `N/A`, because there is no sandbox to lose.
+
 ## What this repo has not done
 
 The operator created `route66-drivein-demo` separately. A probe JSON from a laptop is not a substitute for the command above on that VM, and it is not a video.

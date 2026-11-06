@@ -2,7 +2,7 @@
   "name": "route66-drivein-eta",
   "version": "0.1.0",
   "private": true,
-  "description": "Route 66 Drive-In — US order-on-the-go ETA agent for Vultr Agent Rush Challenge 1.",
+  "description": "Route 66 Drive-In \u2014 US order-on-the-go ETA agent for Vultr Agent Rush Challenge 1.",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -12,7 +12,8 @@
     "start": "NODE_OPTIONS='--experimental-sqlite' tsx src/server.ts",
     "sandbox:solve": "tsx sandbox/fire-time-solver/cli.ts",
     "test": "NODE_OPTIONS='--experimental-sqlite' tsx --test sandbox/fire-time-solver/solver.test.ts agent/structured.test.ts src/kitchen-auth.test.ts src/hours.test.ts src/sandbox-runner.test.ts src/api.test.ts src/decision-trail.test.ts scripts/assemble-evidence.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "inference:check": "tsx scripts/check-inference.ts"
   },
   "dependencies": {
     "express": "^4.21.2",

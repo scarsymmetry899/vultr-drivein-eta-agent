@@ -35,6 +35,8 @@ test("an early check-in records that the planned fire was replaced", () => {
   });
   assert.match(trail.solver.changes.join(" "), /arrived before the grill/i);
   assert.match(trail.solver.changes.join(" "), /earlier fire time was replaced/i);
+  assert.match(trail.solver.changes.join(" "), /fire 5:59 PM CST → 5:40 PM CST/);
+  assert.equal(trail.solver.previous_fire_at, "2026-11-05T23:59:00.000Z");
   assert.equal(trail.solver.fire_at, "2026-11-05T23:40:00.000Z");
   assert.equal(trail.explanation.source, "deterministic");
   assert.equal(trail.explanation.live, false);
