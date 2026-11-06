@@ -121,6 +121,10 @@ function renderCard(card, now) {
       ["Arrive", short(card.eta_timestamp), ""],
       ["Fire", card.kitchen_start_at ? short(card.kitchen_start_at) : "not timed", "red"],
     ]));
+    const hold = node("button", "pit-btn dark", card.fire_hold ? "Release the fire" : "Hold the fire");
+    hold.type = "button";
+    hold.addEventListener("click", () => postHold(card, hold));
+    article.append(hold);
   } else if (card.status === "cooking") {
     const start = card.kitchen_start_at ? Date.parse(card.kitchen_start_at) : now.getTime();
     const end = card.ready_by ? Date.parse(card.ready_by) : start;
@@ -158,6 +162,7 @@ function renderCard(card, now) {
     button.addEventListener("click", () => postStatus(card.id, "picked-up", button));
     article.append(button);
   }
+  if (card.payment_label) article.append(node("p", "tc-owner", card.payment_label));
   if (card.next_step) article.append(node("p", "tc-owner", card.next_step));
   if (card.exception) article.append(node("p", "tc-note", card.exception));
   if (card.last_action) article.append(node("p", "tc-owner", presentIsoClocks(card.last_action, timeZone)));
@@ -172,6 +177,25 @@ function renderLane(key, cards, now, emptyText) {
     return;
   }
   for (const card of cards) lanes[key].append(renderCard(card, now));
+}
+
+async function postHold(card, button) {
+  if (button.disabled) return;
+  button.disabled = true;
+  try {
+    const response = await kitchenFetch(`/api/orders/${card.id}/hold`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ held: !card.fire_hold }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) statusLine.textContent = body.error || "The hold was refused.";
+    await refresh();
+    if (!response.ok) statusLine.textContent = body.error || "The hold was refused.";
+  } catch {
+    statusLine.textContent = "The board could not reach the server. The hold was not confirmed.";
+    button.disabled = false;
+  }
 }
 
 async function postStatus(id, action, button) {

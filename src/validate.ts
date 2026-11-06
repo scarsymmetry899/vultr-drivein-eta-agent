@@ -2,6 +2,7 @@ import type { AppConfig } from "./config.ts";
 import { findMenuItem } from "./menu.ts";
 import { describeArrivalHours, matchHostile } from "../sandbox/fire-time-solver/solver.ts";
 import { unavailableBySku } from "./store.ts";
+import { parsePaymentChoice } from "./payment.ts";
 import type { NewOrderInput, OrderItem } from "./types.ts";
 
 const COLORS = new Set(["red", "white", "black", "blue", "silver", "green", "yellow", "other"]);
@@ -47,6 +48,9 @@ export function parseOrderBody(body: unknown, config: AppConfig, now = new Date(
   for (const line of lines.items) subtotal += line.price_cents * line.qty;
   const salesTax = Math.round(subtotal * config.salesTaxRate);
   const orderType = eta.getTime() <= now.getTime() + 2 * 60_000 ? "now" : "preorder";
+  const payment = parsePaymentChoice(record.payment);
+  if (typeof payment !== "string") return { error: payment.error };
+  const arrivalOptIn = record.arrival_opt_in === true;
 
   return {
     customer_name: customerName,
@@ -60,6 +64,8 @@ export function parseOrderBody(body: unknown, config: AppConfig, now = new Date(
     subtotal_cents: subtotal,
     sales_tax_cents: salesTax,
     order_type: orderType,
+    arrival_opt_in: arrivalOptIn,
+    payment_state: payment,
   };
 }
 

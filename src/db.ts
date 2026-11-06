@@ -25,6 +25,7 @@ export function openDatabase(): DatabaseSync {
   const schemaPath = join(dirname(fileURLToPath(import.meta.url)), "../db/sqlite.sql");
   next.exec(readFileSync(schemaPath, "utf8"));
   ensureDecisionTrail(next);
+  ensureServiceColumns(next);
   seedUnavailable(next);
   database = next;
   databasePath = path;
@@ -46,6 +47,16 @@ function ensureDecisionTrail(db: DatabaseSync): void {
   const columns = db.prepare("PRAGMA table_info(drivein_orders)").all() as { name: string }[];
   if (columns.some((column) => column.name === "decision_trail")) return;
   db.exec("ALTER TABLE drivein_orders ADD COLUMN decision_trail TEXT");
+}
+
+function ensureServiceColumns(db: DatabaseSync): void {
+  const columns = db.prepare("PRAGMA table_info(drivein_orders)").all() as { name: string }[];
+  const names = new Set(columns.map((column) => column.name));
+  if (!names.has("fire_hold")) db.exec("ALTER TABLE drivein_orders ADD COLUMN fire_hold INTEGER NOT NULL DEFAULT 0");
+  if (!names.has("arrival_opt_in")) db.exec("ALTER TABLE drivein_orders ADD COLUMN arrival_opt_in INTEGER NOT NULL DEFAULT 0");
+  if (!names.has("payment_state")) {
+    db.exec("ALTER TABLE drivein_orders ADD COLUMN payment_state TEXT NOT NULL DEFAULT 'pay_at_window'");
+  }
 }
 
 function seedUnavailable(db: DatabaseSync): void {

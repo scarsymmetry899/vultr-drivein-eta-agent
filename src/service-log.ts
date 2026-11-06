@@ -1,5 +1,5 @@
 export type ServiceActor = "guest" | "solver" | "kitchen";
-export type ServiceStep = "schedule" | "check_in" | "ready" | "picked_up" | "refused";
+export type ServiceStep = "schedule" | "check_in" | "ready" | "picked_up" | "refused" | "auto_fire" | "approach" | "hold" | "payment";
 export type ServiceResult = "done" | "refused" | "unchanged";
 
 export interface ServiceAction {

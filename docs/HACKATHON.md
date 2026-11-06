@@ -40,7 +40,8 @@ It is not a restaurant, a pilot, or an autonomous kitchen. It does not take paym
 - Public code: this repository.
 - Operator-reported VM: `route66-drivein-demo`, `65.20.93.98`, Ubuntu 24.04, Mumbai, 1 vCPU / 2 GB, serving `3bdfb827e00e01f4ac3de68efb077a3e0facd6fc`.
 - Inference on that VM: `deepseek-v4.1-flash-1017`. Ticket `R66-23873` at 00:53 IST on 7 Nov 2026 is the post-restart accepted reply. Health shows `live_call_verified: true` only for the current process.
-- Staff ready and picked up on that deployed board: in independent testing. Not confirmed in this repository.
+- Staff path on the deployed process, authenticated API, ticket `R66-23873`: stall check-in `200` cooking, ready `200`, picked up `200` completed. Early check-in moved fire 1:49 PM CST to 1:42 PM CST and ready 1:57 PM CST to 1:50 PM CST. Ready on a confirmed ticket was `409`. Board with the token was `200` and without it `401`. A second pickup on `R66-17299` was `409`. The full live action log was truncated. Overdue, late-car, and hold behavior were not in that test.
+- Deployed commit `3bdfb827` still auto-marks ready when `ready_by` passes. The code after that leaves ready as a staff click. That code is not what the VM is serving.
 - Containment: verified on a Docker build container on 6 Nov 2026 (probe, killed loop, Docker-down drill, real daemon stop). Re-run on the VM when recording.
 - Video, slide deck, and final submission: not sent.
 

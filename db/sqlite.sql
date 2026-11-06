@@ -29,6 +29,10 @@ CREATE TABLE IF NOT EXISTS drivein_orders (
   arrived_at         TEXT,
   schedule_reason    TEXT,
   decision_trail     TEXT,
+  fire_hold          INTEGER NOT NULL DEFAULT 0 CHECK (fire_hold IN (0, 1)),
+  arrival_opt_in     INTEGER NOT NULL DEFAULT 0 CHECK (arrival_opt_in IN (0, 1)),
+  payment_state      TEXT NOT NULL DEFAULT 'pay_at_window'
+                       CHECK (payment_state IN ('pay_at_window', 'demo_unpaid', 'demo_marked')),
   created_at         TEXT NOT NULL,
   updated_at         TEXT NOT NULL,
   CHECK (grand_total_cents = subtotal_cents + sales_tax_cents)
