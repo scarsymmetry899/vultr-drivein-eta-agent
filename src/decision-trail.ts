@@ -11,11 +11,16 @@ export interface DecisionTrail {
     ready_by: string | null;
     decision: string;
     changes: string[];
+    /** Set when an early check-in replaced a planned fire time. */
+    previous_fire_at?: string | null;
+    previous_ready_by?: string | null;
+    arrived_at?: string | null;
   };
   explanation: {
     mode: string;
     source: "deterministic" | "vultr";
     live: boolean;
+    model?: string | null;
     text: string;
     warning: string | null;
   };
@@ -47,6 +52,7 @@ export function trailFromSchedule(input: {
       mode: input.explanation.mode,
       source: input.explanation.source,
       live: input.explanation.live,
+      model: input.explanation.live ? input.explanation.model : null,
       text: input.explanation.text,
       warning: input.explanation.warning,
     },
@@ -60,13 +66,30 @@ export function trailForEarlyArrival(input: {
   prepMinutes: number;
   fireAt: string;
   readyBy: string;
+  timeZone?: string;
 }): DecisionTrail {
-  const changes = [
-    "You arrived before the grill was scheduled to start. Cooking started at check-in.",
-  ];
+  const at = (iso: string) =>
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: input.timeZone ?? "America/Chicago",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+    }).format(new Date(iso));
+  const changes: string[] = [];
   if (input.previousFire) {
-    changes.push("The earlier fire time was replaced. It is not the clock on this ticket anymore.");
+    changes.push(
+      `You arrived before the grill was scheduled to start. You checked in at ${at(input.fireAt)}, ahead of the planned fire at ${at(input.previousFire)}. Cooking started at check-in.`,
+    );
+    changes.push(
+      `The earlier fire time was replaced: fire ${at(input.previousFire)} → ${at(input.fireAt)}` +
+        (input.previousReady ? `, ready ${at(input.previousReady)} → ${at(input.readyBy)}.` : `, ready ${at(input.readyBy)}.`),
+    );
+  } else {
+    changes.push(
+      `You arrived before the grill was scheduled to start. You checked in at ${at(input.fireAt)} before the grill was timed. Cooking started at check-in.`,
+    );
   }
+  changes.push(`Prep is ${input.prepMinutes} min, so the bag is due at ${at(input.readyBy)}.`);
   return {
     solver: {
       arrival: input.arrival,
@@ -76,11 +99,15 @@ export function trailForEarlyArrival(input: {
       ready_by: input.readyBy,
       decision: "fire",
       changes,
+      previous_fire_at: input.previousFire,
+      previous_ready_by: input.previousReady,
+      arrived_at: input.fireAt,
     },
     explanation: {
       mode: "demo",
       source: "deterministic",
       live: false,
+      model: null,
       text: "This sentence is from the check-in rule, not from a model.",
       warning: null,
     },

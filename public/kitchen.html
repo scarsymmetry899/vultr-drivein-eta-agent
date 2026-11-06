@@ -80,6 +80,11 @@
             <p class="filter-result" id="filter-result"><span class="verdict idle">NOT RUN</span><span>A filter, not a container proof.</span></p>
             <button type="button" id="drill" class="pit-btn outline">Run the note filter</button>
           </div>
+          <div class="filter-box drill-box">
+            <p class="eyebrow">Docker-down drill</p>
+            <p class="filter-result" id="fail-result"><span class="verdict idle">NOT RUN</span><span>Runs the real solver path with the Docker daemon unreachable. No order is touched.</span></p>
+            <button type="button" id="fail-closed" class="pit-btn outline">Run the Docker-down drill</button>
+          </div>
           <div class="sys-actions">
             <button type="button" id="probe" class="pit-btn">Run the sandbox probe</button>
             <p>The probe runs only when this server uses the Docker runner. Each run is a fresh container.</p>

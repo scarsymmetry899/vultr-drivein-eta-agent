@@ -7,6 +7,7 @@ import type { AppConfig } from "./config.ts";
 import { dockerRunArgs, runSolver, sandboxChildEnv, SandboxUnavailableError } from "./sandbox-runner.ts";
 import type { SpawnLike } from "./sandbox-runner.ts";
 import { SAMPLE_INPUT } from "../sandbox/fire-time-solver/solver.ts";
+import { DOCKER_DOWN_SOCKET, runFailClosedDrill } from "./schedule.ts";
 
 function dockerConfig(): AppConfig {
   return {
@@ -123,4 +124,25 @@ test("docker stdout is the schedule, not a recomputed in-process result", async 
   assert.equal(outcome.isolation, "docker");
   assert.equal(outcome.result.prep_minutes, 12345);
   assert.equal(outcome.result.reason, "from the container");
+});
+
+test("docker-down drill points docker at a missing daemon and reports fail-closed", async () => {
+  let seenHost = "";
+  const spawnImpl: SpawnLike = (_cmd, _args, options) => {
+    seenHost = String((options as { env?: NodeJS.ProcessEnv }).env?.DOCKER_HOST ?? "");
+    return fakeSpawn((child) => child.emit("close", 1, null))("docker", [], {});
+  };
+  const report = await runFailClosedDrill(dockerConfig(), spawnImpl);
+  assert.equal(seenHost, DOCKER_DOWN_SOCKET);
+  assert.equal(report.applicable, true);
+  assert.equal(report.held, true);
+  assert.equal(report.status, 503);
+  assert.equal(report.scheduled, false);
+  assert.equal(report.in_process_fallback, false);
+});
+
+test("docker-down drill says it proves nothing in-process", async () => {
+  const report = await runFailClosedDrill({ ...dockerConfig(), sandboxRunner: "inprocess" });
+  assert.equal(report.applicable, false);
+  assert.equal(report.held, false);
 });

@@ -39,6 +39,24 @@ export function inferenceChatUrl(): string {
 
 type FetchLike = typeof fetch;
 
+let lastLive: { at: string; model: string } | null = null;
+
+/**
+ * True only after this process got a live Vultr reply that passed the schema.
+ * It resets on restart. A key alone never makes it true.
+ */
+export function liveCallStatus(): { verified: boolean; at: string | null; model: string | null } {
+  return { verified: lastLive !== null, at: lastLive?.at ?? null, model: lastLive?.model ?? null };
+}
+
+export function resetLiveCallStatus(): void {
+  lastLive = null;
+}
+
+function recordLive(model: string | null): void {
+  lastLive = { at: new Date().toISOString(), model: model ?? "" };
+}
+
 /** A key is present. Live mode still has to be selected explicitly. */
 export function inferenceConfigured(): boolean {
   const key = process.env.VULTR_INFERENCE_API_KEY?.trim() ?? "";
@@ -101,6 +119,7 @@ export async function explainDecision(
         warning: `Model output was discarded. ${accepted.reason}`,
       };
     }
+    recordLive(model);
     return { mode: "live", live: true, source: "vultr", model, text: accepted.summary, warning: null };
   } catch (error) {
     return {
@@ -148,6 +167,7 @@ export async function parseUtterance(
       };
     }
     const names = new Map(menu.map((item) => [item.sku, item.name]));
+    recordLive(process.env.VULTR_INFERENCE_MODEL?.trim() || null);
     return {
       mode: "live",
       live: true,
@@ -204,27 +224,30 @@ async function chat(
 ): Promise<string> {
   const key = process.env.VULTR_INFERENCE_API_KEY?.trim() ?? "";
   const model = process.env.VULTR_INFERENCE_MODEL?.trim() ?? "";
-  const response = await fetchImpl(inferenceChatUrl(), {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${key}`,
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0,
-      max_tokens: 220,
-      response_format: {
-        type: "json_schema",
-        json_schema: { name: schemaName, strict: true, schema },
+  const send = (structured: boolean) =>
+    fetchImpl(inferenceChatUrl(), {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${key}`,
       },
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: JSON.stringify(payload) },
-      ],
-    }),
-    signal: AbortSignal.timeout(8_000),
-  });
+      body: JSON.stringify({
+        model,
+        temperature: 0,
+        max_tokens: 220,
+        ...(structured
+          ? { response_format: { type: "json_schema", json_schema: { name: schemaName, strict: true, schema } } }
+          : {}),
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: JSON.stringify(payload) },
+        ],
+      }),
+      signal: AbortSignal.timeout(8_000),
+    });
+  let response = await send(true);
+  // Some hosted models reject json_schema. Ask again for plain JSON; the reply is still schema-checked here.
+  if (response.status === 400 || response.status === 422) response = await send(false);
   if (!response.ok) throw new Error(`Inference HTTP ${response.status}`);
   const json = (await response.json()) as { choices?: { message?: { content?: string } }[] };
   return json.choices?.[0]?.message?.content?.trim() ?? "";

@@ -951,10 +951,10 @@ function decisionPanel(order) {
   const solver = trail?.solver;
   const tiles = el("div", "tiles");
   tiles.append(
-    tile("Arrival", clockShort(order.eta_timestamp), ""),
+    tile("Arrival", clockShort(order.eta_timestamp), "", solver?.arrived_at ? `here ${clockShort(solver.arrived_at)}` : ""),
     tile("Prep", solver?.prep_minutes != null ? `${solver.prep_minutes} min` : order.prep_minutes != null ? `${order.prep_minutes} min` : "—", ""),
-    tile("Fire", solver?.fire_at ? clockShort(solver.fire_at) : "—", "fire-t"),
-    tile("Ready", solver?.ready_by ? clockShort(solver.ready_by) : "—", "ready-t"),
+    tile("Fire", solver?.fire_at ? clockShort(solver.fire_at) : "—", "fire-t", solver?.previous_fire_at ? `was ${clockShort(solver.previous_fire_at)}` : ""),
+    tile("Ready", solver?.ready_by ? clockShort(solver.ready_by) : "—", "ready-t", solver?.previous_ready_by ? `was ${clockShort(solver.previous_ready_by)}` : ""),
   );
   box.append(tiles);
   if (!solver) {
@@ -974,14 +974,15 @@ function decisionPanel(order) {
   return box;
 }
 
-function tile(label, value, className) {
+function tile(label, value, className, was) {
   const node = el("div", `tile ${className}`.trim());
   node.append(el("span", "", label), el("strong", "", value));
+  if (was) node.append(el("s", "", was));
   return node;
 }
 
 function wordingLabel(wording) {
-  if (wording.live && wording.source === "vultr") return "Wording from Vultr Serverless Inference";
+  if (wording.live && wording.source === "vultr") return `Wording from Vultr Serverless Inference${wording.model ? ` · ${wording.model}` : ""}`;
   if (wording.mode === "live-rejected") return "Model wording discarded. Solver sentence shown.";
   if (wording.mode === "live-failed") return "Live inference did not answer. Solver sentence shown.";
   return "Wording is deterministic. No model call.";
@@ -1036,7 +1037,7 @@ function renderFind() {
   main.append(head);
   if (state.error) main.append(el("p", "alert", state.error));
   const form = el("form", "review-card find-card");
-  const number = inputField("Ticket number", "number", "", { placeholder: "R66-0142", autocomplete: "off", className: "mono" });
+  const number = inputField("Ticket number", "number", "", { placeholder: "R66-12345", autocomplete: "off", className: "mono" });
   const plate = inputField("Plate", "plate", "", { maxLength: 12, className: "plate-input", autocomplete: "off" });
   number.input.required = true;
   plate.input.required = true;

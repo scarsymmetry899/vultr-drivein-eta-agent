@@ -94,3 +94,33 @@ test("live calls use only the official Vultr inference host", async () => {
   delete process.env.VULTR_INFERENCE_BASE_URL;
   process.env.INFERENCE_MODE = "demo";
 });
+
+test("a live reply that passes the schema marks the live call verified; json_schema 400 retries as plain JSON", async () => {
+  const { liveCallStatus, resetLiveCallStatus } = await import("./inference.ts");
+  resetLiveCallStatus();
+  process.env.INFERENCE_MODE = "live";
+  process.env.VULTR_INFERENCE_API_KEY = "test-key-not-real";
+  process.env.VULTR_INFERENCE_MODEL = "demo-model";
+  const bodies: string[] = [];
+  const explanation = await explainDecision(
+    { orderNumber: "R66-10000", carPlate: "TX-1", decision: solveFireTime(SAMPLE_INPUT) },
+    {
+      fetchImpl: async (_url, init) => {
+        bodies.push(String(init?.body || ""));
+        if (bodies.length === 1) return new Response("json_schema unsupported", { status: 400 });
+        return Response.json({ choices: [{ message: { content: '{"summary":"The grill fires at 5:59 PM so the bag is ready at 6:07 PM."}' } }] });
+      },
+    },
+  );
+  assert.equal(bodies.length, 2);
+  assert.match(bodies[0] ?? "", /json_schema/);
+  assert.doesNotMatch(bodies[1] ?? "", /response_format/);
+  assert.equal(explanation.mode, "live");
+  assert.equal(explanation.source, "vultr");
+  assert.equal(liveCallStatus().verified, true);
+  assert.equal(liveCallStatus().model, "demo-model");
+  resetLiveCallStatus();
+  delete process.env.VULTR_INFERENCE_API_KEY;
+  delete process.env.VULTR_INFERENCE_MODEL;
+  process.env.INFERENCE_MODE = "demo";
+});
