@@ -30,6 +30,13 @@ export interface MenuName {
 
 const PLACEHOLDER = /^(your[_-]|changeme|placeholder|todo)?$/i;
 
+/** Every live call goes here. The key is not sent to any other host. */
+export const VULTR_INFERENCE_BASE = "https://api.vultrinference.com/v1";
+
+export function inferenceChatUrl(): string {
+  return `${VULTR_INFERENCE_BASE}/chat/completions`;
+}
+
 type FetchLike = typeof fetch;
 
 /** A key is present. Live mode still has to be selected explicitly. */
@@ -195,10 +202,9 @@ async function chat(
   schema: object,
   fetchImpl: FetchLike,
 ): Promise<string> {
-  const base = (process.env.VULTR_INFERENCE_BASE_URL?.trim() || "https://api.vultrinference.com/v1").replace(/\/$/, "");
   const key = process.env.VULTR_INFERENCE_API_KEY?.trim() ?? "";
   const model = process.env.VULTR_INFERENCE_MODEL?.trim() ?? "";
-  const response = await fetchImpl(`${base}/chat/completions`, {
+  const response = await fetchImpl(inferenceChatUrl(), {
     method: "POST",
     headers: {
       "content-type": "application/json",

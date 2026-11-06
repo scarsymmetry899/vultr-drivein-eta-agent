@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS drivein_orders (
   guest_here         INTEGER NOT NULL DEFAULT 0 CHECK (guest_here IN (0, 1)),
   arrived_at         TEXT,
   schedule_reason    TEXT,
+  decision_trail     TEXT,
   created_at         TEXT NOT NULL,
   updated_at         TEXT NOT NULL,
   CHECK (grand_total_cents = subtotal_cents + sales_tax_cents)

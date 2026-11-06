@@ -453,7 +453,7 @@ function renderTicket() {
     main.append(el("p", "quiet", `Arrival at the lot: ${order.eta_time}. Ticket times are Austin time. Pay at the window.`));
     main.append(timeline(order));
     if (state.error) main.append(el("p", "alert", state.error));
-    const bar = el("div", "action-bar");
+    const bar = el("div", "action-bar flow");
     if (order.status === "confirmed" && !order.kitchen_start_at) {
       const time = el("button", "primary wide", state.busy ? "Timing…" : "Time the grill");
       time.type = "button";
@@ -469,10 +469,44 @@ function renderTicket() {
       bar.append(here);
     }
     if (bar.childElementCount) main.append(bar);
+    main.append(decisionPanel(order));
     if (order.status === "completed") main.append(el("p", "lede", "This ticket was picked up."));
   }
   page.append(main);
   mount(page);
+}
+
+function decisionPanel(order) {
+  const box = el("section", "trail");
+  box.append(el("h2", "trail-title", "How this time was set"));
+  const trail = order.decision_trail;
+  if (!trail?.solver) {
+    box.append(el("p", "quiet", "The grill has not been timed yet. The solver has not published a fire time."));
+    return box;
+  }
+  const solver = trail.solver;
+  box.append(lineRow("Arrival", solver.arrival || order.eta_time));
+  box.append(lineRow("Prep", solver.prep_minutes == null ? "Not set" : `${solver.prep_minutes} min`));
+  box.append(lineRow("Fire", solver.fire_at ? clock(solver.fire_at) : "Not set"));
+  box.append(lineRow("Ready", solver.ready_by ? clock(solver.ready_by) : "Not set"));
+  box.append(el("p", "field-label", "What changed"));
+  const changes = el("ul", "changes");
+  const lines = solver.changes?.length ? solver.changes : ["No extra change was recorded."];
+  for (const change of lines) changes.append(el("li", "", change));
+  box.append(changes);
+  const wording = trail.explanation || {};
+  box.append(el("p", "badge", wordingLabel(wording)));
+  if (wording.text) box.append(el("p", "", wording.text));
+  if (wording.warning) box.append(el("p", "quiet", wording.warning));
+  box.append(el("p", "quiet", "Fire and ready come from the solver. The sentence above does not move those times."));
+  return box;
+}
+
+function wordingLabel(wording) {
+  if (wording.live && wording.source === "vultr") return "Wording from Vultr Serverless Inference";
+  if (wording.mode === "live-rejected") return "Model wording discarded. Solver sentence shown.";
+  if (wording.mode === "live-failed") return "Live inference did not answer. Solver sentence shown.";
+  return "Wording is deterministic. No model call.";
 }
 
 function timeline(order) {

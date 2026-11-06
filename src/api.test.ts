@@ -168,6 +168,10 @@ test("guest ticket is priced, scheduled, and rushed onto the board", async () =>
     assert.equal(scheduleBody.order.items[0].sku, "classic-burger");
     assert.equal(scheduleBody.decision.host_effects, "none");
     assert.ok(scheduleBody.order.kitchen_start_at);
+    assert.equal(scheduleBody.order.decision_trail.explanation.source, "deterministic");
+    assert.equal(scheduleBody.order.decision_trail.explanation.live, false);
+    assert.equal(scheduleBody.order.decision_trail.solver.fire_at, scheduleBody.order.kitchen_start_at);
+    assert.equal(scheduleBody.order.decision_trail.solver.ready_by, scheduleBody.order.ready_by);
 
     const locked = await fetch(`${base}/api/kitchen/board`);
     assert.equal(locked.status, 401);
@@ -189,6 +193,9 @@ test("guest ticket is priced, scheduled, and rushed onto the board", async () =>
     assert.equal(againBody.applied, false);
     assert.equal(againBody.order.status, "cooking");
     assert.equal(againBody.order.kitchen_start_at, arrived.order.kitchen_start_at);
+    assert.match(arrived.order.decision_trail.solver.changes.join(" "), /arrived before the grill/i);
+    assert.equal(arrived.order.decision_trail.solver.fire_at, arrived.order.kitchen_start_at);
+    assert.equal(arrived.order.decision_trail.explanation.source, "deterministic");
 
     const after = await (await fetch(`${base}/api/kitchen/board`, pit())).json();
     const firing = after.firing.find((card: { id: string }) => card.id === order.id);
@@ -212,6 +219,8 @@ test("guest ticket is priced, scheduled, and rushed onto the board", async () =>
     const health = await (await fetch(`${base}/api/health`)).json();
     assert.equal(health.persistence, "sqlite");
     assert.equal(health.inference_mode, "demo");
+    assert.equal(health.inference_endpoint, "https://api.vultrinference.com/v1");
+    assert.equal(health.live_call_verified, false);
     assert.equal(health.isolation, "none");
     assert.equal(health.fail_closed, false);
     assert.equal(health.kitchen_auth, true);

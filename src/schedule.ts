@@ -10,6 +10,7 @@ import {
   getOrder,
   setScheduleReason,
 } from "./store.ts";
+import { trailFromSchedule } from "./decision-trail.ts";
 import { HOSTILE_DEMO_INPUT } from "../sandbox/fire-time-solver/solver.ts";
 import type { SolveResult } from "../sandbox/fire-time-solver/types.ts";
 import type { DriveInOrder } from "./types.ts";
@@ -108,8 +109,16 @@ export async function scheduleOrder(
   });
   const parse = await maybeParse(utterance);
 
+  const trail = JSON.stringify(
+    trailFromSchedule({
+      arrival: existing.eta_time,
+      decision: outcome.result,
+      explanation,
+    }),
+  );
+
   if (outcome.result.decision === "refuse" || !outcome.result.fire_at || !outcome.result.ready_by) {
-    const order = setScheduleReason(existing.id, outcome.result.reason) ?? existing;
+    const order = setScheduleReason(existing.id, outcome.result.reason, trail) ?? existing;
     return {
       applied: false,
       runner: outcome.runner,
@@ -131,6 +140,7 @@ export async function scheduleOrder(
     buffer_minutes: outcome.result.buffer_minutes,
     reason: outcome.result.reason,
     status,
+    decision_trail: trail,
   });
 
   return {

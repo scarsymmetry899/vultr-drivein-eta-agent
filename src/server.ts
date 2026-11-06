@@ -42,6 +42,8 @@ export function createApp(): express.Express {
       fail_closed: config.sandboxRunner === "docker",
       inference_mode: config.inferenceMode,
       inference_configured: inferenceConfigured(),
+      inference_endpoint: "https://api.vultrinference.com/v1",
+      live_call_verified: false,
       kitchen_auth: kitchenConfigured(),
     });
   });
