@@ -57,6 +57,9 @@ test("guest ticket is priced, scheduled, and rushed onto the board", async () =>
     const home = await fetch(`${base}/`);
     assert.equal(home.status, 200);
     assert.match(await home.text(), /Route 66 Drive-In/);
+    const cartPage = await fetch(`${base}/cart`);
+    assert.equal(cartPage.status, 200);
+    assert.match(await cartPage.text(), /guest-app.js/);
     const kitchenPage = await fetch(`${base}/kitchen.html`);
     assert.match(await kitchenPage.text(), /Kitchen/);
 

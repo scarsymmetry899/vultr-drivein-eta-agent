@@ -228,13 +228,9 @@ probeButton.addEventListener("click", async () => {
 try {
   const health = await fetch("/api/health");
   const status = await health.json();
-  const isolation = status.isolation === "docker"
-    ? "Docker sandbox is required and fails closed."
-    : "Demo runner is in this process. Isolation is not active.";
-  const inference = status.inference_mode === "live"
-    ? "Live inference is selected."
-    : "Inference is in demo mode.";
-  banner.textContent = `${inference} ${isolation}`;
+  banner.textContent = status.inference_mode === "live"
+    ? "Live wording is on. Grill times still come from the kitchen clock."
+    : "Demo service. Grill times are calculated here, not by a live model.";
 } catch {
   banner.textContent = "Service status did not load.";
 }

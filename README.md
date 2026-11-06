@@ -107,13 +107,13 @@ Then set `SANDBOX_RUNNER=docker` in `.env` if the API should dispatch into that 
 
 ## Deploy on the existing Vultr VM
 
-Not done yet. The machine is `route66-drivein-demo` at `65.20.93.98`. After this change is on `main`, paste the root console command in [`deploy/READINESS.md`](deploy/READINESS.md). It installs Node 22 and Docker, builds the solver image, keeps SQLite on disk, runs demo inference (no API key), and locks the kitchen behind a token generated on the VM.
+The machine `route66-drivein-demo` at `65.20.93.98` is already running an older build. Do not run `browser-console.sh` again. After this change is on `main`, use [`deploy/UPDATE.md`](deploy/UPDATE.md). That update keeps `.env`, the kitchen token, Docker mode, and the SQLite file.
 
-The pit board is not public. Guest ordering is. Staff actions and the list of plates need `X-Kitchen-Token`.
+The guest app is separate screens: menu by category, item, bag, checkout (arrival, vehicle, review), and a ticket timeline. The kitchen is a staff board. Demo wording stays in the footer. There is no account and no card charge.
+
+The pit board is not public. Staff actions and the list of plates need `X-Kitchen-Token`.
 
 The demo lot pin in `.env.example` is `30.2500`, `-97.7490` (South Congress, Austin). It is a map pin for the story, not a business listing.
-
-Guest pages are mobile-first: menu, bag, plate, arrival time, then a ticket with **I'm at the stall**. There is no account and no card charge. The kitchen is a separate high-contrast board with Waiting, Firing, and Ready, plus text labels for overdue tickets.
 
 ## Environment
 

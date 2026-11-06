@@ -1,5 +1,5 @@
 import express, { type NextFunction, type Request, type Response } from "express";
-import { dirname, join, resolve } from "node:path";
+import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config.ts";
 import { databaseOk } from "./db.ts";
@@ -245,6 +245,11 @@ export function createApp(): express.Express {
 
   const publicDir = join(dirname(fileURLToPath(import.meta.url)), "../public");
   app.use(express.static(publicDir));
+  app.use((req, res, next) => {
+    if (req.method !== "GET" && req.method !== "HEAD") return next();
+    if (req.path.startsWith("/api") || extname(req.path)) return next();
+    res.sendFile(join(publicDir, "index.html"));
+  });
 
   app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
     const parseFailed =
