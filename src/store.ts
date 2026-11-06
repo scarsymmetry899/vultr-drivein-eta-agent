@@ -161,6 +161,7 @@ export function getOrder(id: string): DriveInOrder | undefined {
 }
 
 export function findOrder(orderNumber: string, carPlate: string): DriveInOrder | undefined {
+  promoteDueFires();
   const row = openDatabase()
     .prepare(`${ORDER_SELECT} WHERE order_number = ? AND car_plate = ?`)
     .get(orderNumber, carPlate) as OrderRow | undefined;
