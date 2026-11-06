@@ -1,12 +1,22 @@
 # Route 66 Drive-In
 
-A fictional Austin drive-in where a guest preorders with an ETA and a car plate. An agent on a Vultr VM asks the sandbox when to fire the grill. The kitchen board shows the ticket as waiting, firing, or ready.
+A fictional Austin drive-in. A guest opens a ticket with an arrival time and a plate. The solver on a Vultr VM decides when the grill fires. Kitchen staff mark the bag ready and hand it off. Optional Vultr Serverless Inference may write the sentence under those times. It does not set them.
 
-This repository is a working demo for [Vultr Agent Rush](https://lablab.ai/ai-hackathons/vultr-hackathon). Challenge 1 is the isolated solver. Challenge 2, Future of Work, is the service path on that same Vultr VM: a guest places an order, the solver schedules the grill, an early check-in re-times it, and a person marks the bag ready and then picked up. The rules are explicit. The model, when it answers, only writes the sentence.
+This repository is the Challenge 2 entry for [Vultr Agent Rush](https://lablab.ai/ai-hackathons/vultr-hackathon), **Future of Work**. The event names five focus areas: sales operations, finance and accounting, HR and recruitment, customer support, and procurement ([event page](https://lablab.ai/ai-hackathons/vultr-hackathon)). This demo is a restaurant service counter. The nearest named area is customer support: a ticket is opened, the timing is checked, a bounded action is taken, and a person is required when the bag or the car needs a decision. It is not a CRM, a ledger, a hiring desk, or a purchasing system.
 
-An operator created the VM `route66-drivein-demo` (`65.20.93.98`). On 6 Nov 2026 a guest test of ticket `R66-17299` (Time the grill) returned `live_call_verified: true` at `2026-11-06T17:59:23.023Z` for model `deepseek-v4.1-flash-1017`. The badge matched that reply. The flag lives in the server process and clears on restart until the next accepted reply. This repository has not seen the key. That deployed sentence still contained UTC timestamps; the tiles were already Austin time (12:19 PM and 12:27 PM). This tree presents those timestamps in lot time and does not change `fire_at` or `ready_by`. Later commits are on the VM only after [`deploy/UPDATE.md`](deploy/UPDATE.md). This repo does not provision Vultr resources.
+The isolated solver is the Challenge 1 boundary this service uses. The fire time and the ready time come from that solver. The model is optional wording.
 
-Nothing here is a real restaurant, a real order, or a payment. Do not commit customer data, phone numbers, or API keys.
+## Where the project stands
+
+Reported by the operator on 7 Nov 2026. This repo does not provision Vultr resources and has not seen the inference key.
+
+- The VM `route66-drivein-demo` (`65.20.93.98`) is serving commit `3bdfb827e00e01f4ac3de68efb077a3e0facd6fc`.
+- After a restart, Time the grill on ticket `R66-23873` at 00:53 IST returned `live_call_verified: true` for `deepseek-v4.1-flash-1017`. The Austin tiles were 1:49 PM and 1:57 PM CST. That flag belongs to the running process. The next restart clears it until another reply is accepted.
+- An earlier ticket, `R66-17299`, accepted the same model at `2026-11-06T17:59:23.023Z`. That sentence still showed UTC. The restart cleared that check. The display fix in `3bdfb827` is what the operator reports is now deployed.
+- LabLab project page: [route66](https://lablab.build/ai-hackathons/vultr-hackathon/route66). One member. Enrolled. Discord joined. Online was chosen. A form field was not saved. No video, no slide deck, and no final submission have been sent.
+- The staff path on the deployed board, ready and picked up, is being tested separately. This repository does not treat that path as confirmed.
+
+Nothing here is a real restaurant, a real order, a payment, a labor saving, or an enterprise rollout. Do not commit customer data, phone numbers, or API keys. License is MIT. The Hyderabad adaptation is disclosed in [`docs/SOURCE.md`](docs/SOURCE.md).
 
 ## The order
 
@@ -18,23 +28,33 @@ Nothing here is a real restaurant, a real order, or a payment. Do not commit cus
 
 The sample solver ticket is a Classic Burger, fries, and a chocolate shake for a 6:10 PM CT arrival on 5 Nov 2026. Prep is 8 minutes (the grill; fries and the shake run at the same time) plus a 3-minute buffer, so the bag is ready at 6:07 PM and the grill fires at 5:59 PM. `npm run sandbox:solve` prints that decision as JSON.
 
-## Vultr stack this scaffold is shaped for
+## Vultr stack
 
-Challenge 1 wants Vultr as the control plane, with real work dispatched into an isolated runner.
+Challenge 2 asks for a Vultr VM backend and a public web app. Serverless Inference is optional. This app uses the VM for the service workflow. Inference, when live, only supplies the sentence. Challenge 1's sandbox is how the solver runs.
 
 | Piece | Role here |
 | --- | --- |
 | [Vultr Cloud Compute](https://www.vultr.com/products/cloud-compute/) VM | Runs this Express app. The VM is the control plane: it takes the order, calls inference, and dispatches the solver. **Not created by this repo.** |
-| [Vultr Serverless Inference](https://docs.vultr.com/vultr-inference-api) | OpenAI-compatible chat at `https://api.vultrinference.com/v1` only. The code does not send the key to another host. Used only when `INFERENCE_MODE=live` and both the key and model are set. Output must match a JSON schema, is length-limited, and is display copy only. ISO timestamps inside that sentence are shown in Austin time. The stored solver timestamps stay ISO. One deployed process accepted `deepseek-v4.1-flash-1017` at `2026-11-06T17:59:23.023Z`. That check does not survive a restart by itself. |
+| [Vultr Serverless Inference](https://docs.vultr.com/vultr-inference-api) | Optional. OpenAI-compatible chat at `https://api.vultrinference.com/v1` only. The code does not send the key to another host. Used only when `INFERENCE_MODE=live` and both the key and model are set. Output must match a JSON schema, is length-limited, and is display copy only. ISO timestamps inside that sentence are shown in Austin time. The stored solver timestamps stay ISO. The current process on the VM accepted `deepseek-v4.1-flash-1017` for ticket `R66-23873` after a restart. The next restart clears that check. |
 | Docker sandbox | `sandbox/Dockerfile` runs the solver and `containment-probe.mjs`. The API's docker argv drops capabilities, uses `--network=none`, a read-only root, a non-root user, memory, pid, and CPU caps, and a stdout cap. The image has no secrets. |
 
-Pattern A from the challenge (model proposes, sandbox executes, real output comes back) is the path this app is built toward. The numbers on the board come from the solver. Pattern B (sandboxed browser) is not this product.
+The numbers on the board come from the solver. The model does not propose the fire time. A sandboxed browser is not this product.
 
 The default runner is in-process so `npm run dev` works before Docker is installed. Health and the pages call that **demo** mode and **isolation: none**. Set `SANDBOX_RUNNER=docker` after you build the image. If that container cannot start, times out, or writes too much, the API returns 503 and does not schedule the ticket in-process.
 
-## Challenge 1, and what this PR does
+## Challenge 2 workflow
 
-Blast Radius Zero asks for a web agent that does real work inside a sandbox on Vultr, plus a later submission with a public demo URL and a video. The video has to show one containment moment: the sandbox absorbing something unsafe.
+Future of Work asks for a multi-step workflow on a Vultr VM, with a public web app. Inference is optional. A video and a clear use-case explanation are still submission items. They are not in this repository yet. Draft narration is in [`docs/HACKATHON.md`](docs/HACKATHON.md). This repo does not submit it, does not publish a deck, and does not message organizers.
+
+The service steps are rules:
+
+1. The guest builds the ticket.
+2. The solver sets fire and ready.
+3. An early check-in re-times a future fire. A second check-in does not move the clock.
+4. Kitchen staff mark the bag ready.
+5. Kitchen staff mark it picked up.
+
+Exceptions stay visible. A closed-hours arrival is refused. A sold-out item is refused. If Docker cannot run the solver, the API returns 503 and does not invent a fire time. An overdue bag or a late car stays on the board until a person acts.
 
 What is in this codebase:
 
@@ -46,7 +66,7 @@ What is in this codebase:
 - Orders in SQLite (`db/sqlite.sql`), so a restart keeps the board.
 - Deploy recipe in [`deploy/RUNBOOK.md`](deploy/RUNBOOK.md) and the safe update in [`deploy/UPDATE.md`](deploy/UPDATE.md).
 
-The public URL is `http://65.20.93.98:8080/`; it serves whatever commit the operator last deployed. A containment video has not been recorded. Draft narrative, recording steps, and submission text are in [`docs/HACKATHON.md`](docs/HACKATHON.md). This repo does not submit them. Participants claim credits on the [hackathon page](https://lablab.ai/ai-hackathons/vultr-hackathon). This repo does not contain a gift code. Vultr GPUs are not part of the event and are not used here.
+The public URL is `http://65.20.93.98:8080/`. The operator reports it is serving `3bdfb827e00e01f4ac3de68efb077a3e0facd6fc`. A video has not been recorded. Vultr GPUs are not part of the event and are not used here.
 
 ## How this differs from ONE Drive-in
 
@@ -109,9 +129,9 @@ Then set `SANDBOX_RUNNER=docker` in `.env` if the API should dispatch into that 
 
 ## Deploy on the existing Vultr VM
 
-The machine `route66-drivein-demo` at `65.20.93.98` is the operator's VM. Do not run `browser-console.sh` again. After a later commit is on `main`, use [`deploy/UPDATE.md`](deploy/UPDATE.md). That update keeps `.env`, the kitchen token, Docker mode, the inference key, and the SQLite file. Startup adds a `decision_trail` column if the existing file does not have one. It does not wipe orders. Health reports `live_call_verified: true` only after this server process got a live Vultr reply that passed the schema. It goes back to `false` on restart until the next live reply. The guest footer says that. It does not say "this is not a live model" while a reply is accepted, and it does not claim a reply that this process has not accepted.
+The machine `route66-drivein-demo` at `65.20.93.98` is the operator's VM. Do not run `browser-console.sh` again. After a later commit is on `main`, use [`deploy/UPDATE.md`](deploy/UPDATE.md). That update keeps `.env`, the kitchen token, Docker mode, the inference key, and the SQLite file. Startup adds a `decision_trail` column if the existing file does not have one. It does not wipe orders. Health reports `live_call_verified: true` only after this server process got a live Vultr reply that passed the schema. It goes back to `false` on restart until the next live reply. The guest footer follows that process. It names the model after an accepted reply, and it does not claim a reply this process has not accepted.
 
-The guest app is separate screens: menu by category, item, bag, checkout (arrival, vehicle, review), and a ticket with a live fire clock. Under 960px it is a phone layout with a tab bar. At 960px and up it has a sidebar, a bag rail on the menu, and checkout arrival and vehicle side by side. The kitchen is a staff board. Demo wording stays in the footer. There is no account and no card charge.
+The guest app is separate screens: menu by category, item, bag, checkout (arrival, vehicle, review), and a ticket with a live fire clock. Under 960px it is a phone layout with a tab bar. At 960px and up it has a sidebar, a bag rail on the menu, and checkout arrival and vehicle side by side. The kitchen is a staff board. There is no account and no card charge.
 
 The pit board is not public. Staff actions and the list of plates need `X-Kitchen-Token`.
 

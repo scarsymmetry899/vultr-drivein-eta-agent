@@ -50,4 +50,4 @@ These stay in `reference/one-drivein/` and are not dependencies of the US app.
 
 ## What the scaffold adds
 
-Vultr Agent Rush Challenge 1 needs a control plane, a Serverless Inference call, and a sandbox that actually returns a result. Those pieces are new: `agent/`, `sandbox/`, and the Express app. They are stubs and a pure solver, not a production deployment.
+The US pieces added for the hackathon are `agent/`, `sandbox/`, and the Express app. The solver owns fire and ready. Vultr Serverless Inference is optional and only supplies wording. The Vultr VM is a demo of this fictional lot. It is not an enterprise deployment of the Hyderabad restaurant, and the private ONE repository was not modified.

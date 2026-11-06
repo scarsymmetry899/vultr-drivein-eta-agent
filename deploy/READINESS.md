@@ -1,6 +1,6 @@
 # Readiness checklist for route66-drivein-demo
 
-VM already created: `route66-drivein-demo`, `65.20.93.98`, Ubuntu 24.04, Mumbai, 1 vCPU / 2 GB / 55 GB. This checklist does not create or resize it.
+VM already created: `route66-drivein-demo`, `65.20.93.98`, Ubuntu 24.04, Mumbai, 1 vCPU / 2 GB / 55 GB. This checklist does not create or resize it. It is the original first paste. The VM is already running. Later changes, including live inference wording, go through [`UPDATE.md`](UPDATE.md). Do not paste the script again.
 
 Do not paste the script until `main` contains `deploy/browser-console.sh`. Confirm the deploy PR is merged first.
 
