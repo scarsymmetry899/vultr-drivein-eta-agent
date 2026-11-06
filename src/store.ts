@@ -481,14 +481,18 @@ function rushFire(
   const stamp = now.toISOString();
   const prep = existing.prep_minutes ?? ticketPrepMinutes(existing.items);
   const ready = new Date(now.getTime() + prep * 60_000).toISOString();
+  const atStall = action.step === "check_in" && action.actor === "guest";
   const result = openDatabase()
     .prepare(
       `UPDATE drivein_orders
-       SET guest_here = 1, arrived_at = ?, prep_minutes = ?, kitchen_start_at = ?, ready_by = ?,
+       SET guest_here = ?, arrived_at = CASE WHEN ? = 1 THEN ? ELSE arrived_at END,
+           prep_minutes = ?, kitchen_start_at = ?, ready_by = ?,
            status = 'cooking', order_type = 'now', schedule_reason = ?, decision_trail = ?, fire_hold = 0, updated_at = ?
        WHERE id = ? AND status = 'confirmed' AND fire_hold = 0`,
     )
     .run(
+      atStall ? 1 : existing.guest_here ? 1 : 0,
+      atStall ? 1 : 0,
       stamp,
       prep,
       stamp,
@@ -503,6 +507,7 @@ function rushFire(
           fireAt: stamp,
           readyBy: ready,
           timeZone: loadConfig().timezone,
+          kind: action.step === "approach" ? "approach" : "stall",
         }),
       ),
       stamp,

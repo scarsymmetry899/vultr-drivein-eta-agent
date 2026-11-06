@@ -336,6 +336,7 @@ test("guest ticket is priced, scheduled, and rushed onto the board", async () =>
     assert.equal(approachBody.refired, false);
     assert.equal(approachBody.live_gps_verified, false);
     assert.equal(approachBody.order.status, "cooking");
+    assert.equal(approachBody.order.guest_here, false);
     assert.notEqual(approachBody.order.kitchen_start_at, planned);
     assert.equal(JSON.stringify(approachBody).includes("30.25"), false);
     const repeat = await fetch(`${base}/api/orders/${watchedOrder.id}/approach`, {
