@@ -1,0 +1,18 @@
+[Unit]
+Description=Route 66 Drive-In control plane
+After=network.target docker.service
+
+[Service]
+Type=simple
+User=route66
+Group=docker
+WorkingDirectory=/opt/route66
+EnvironmentFile=/opt/route66/.env
+Environment=NODE_OPTIONS=--experimental-sqlite
+ExecStart=/usr/bin/npm start
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

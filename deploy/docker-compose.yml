@@ -1,0 +1,38 @@
+# Optional VM layout. Copy ../.env.example to ../.env first.
+# SANDBOX_RUNNER=docker makes a failed container fail the schedule.
+# The Docker socket lets this app start the solver container. That is broad
+# power on the host. Prefer deploy/route66.service if you can put a service
+# user in the docker group instead of shipping the socket into a container.
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    env_file:
+      - ../.env
+    environment:
+      DATABASE_PATH: /data/drivein.sqlite
+      HOST: 0.0.0.0
+      SANDBOX_RUNNER: docker
+      INFERENCE_MODE: ${INFERENCE_MODE:-demo}
+    volumes:
+      - drivein-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8080/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  drivein-data:

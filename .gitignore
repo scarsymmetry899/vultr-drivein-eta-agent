@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+.DS_Store
+.playwright-mcp/
+data/*.sqlite
+data/*.sqlite-*
+data/*.sqlite-journal
+evidence/

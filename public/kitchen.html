@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kitchen — Route 66 Drive-In</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="pit">
+    <a class="skip" href="#board">Skip to the board</a>
+    <header class="top">
+      <div class="brand">
+        <span class="shield" aria-hidden="true">66</span>
+        <div>
+          <p class="eyebrow">Pit · Austin</p>
+          <h1>Kitchen</h1>
+        </div>
+      </div>
+      <nav>
+        <a href="/">Order</a>
+        <a href="/kitchen.html" aria-current="page">Kitchen</a>
+      </nav>
+    </header>
+    <p id="mode-banner" class="banner" role="status">Loading service status…</p>
+    <p class="strip" id="status-line">Waiting for tickets…</p>
+    <main class="board" id="board">
+      <section class="lane" aria-label="Waiting">
+        <h2>Waiting</h2>
+        <div id="waiting"></div>
+      </section>
+      <section class="lane firing" aria-label="Firing">
+        <h2>Firing</h2>
+        <div id="firing"></div>
+      </section>
+      <section class="lane ready" aria-label="Ready">
+        <h2>Ready</h2>
+        <div id="ready"></div>
+      </section>
+    </main>
+    <section class="panel">
+      <h2>Containment</h2>
+      <p>The note filter refuses a shell-like string. It does not prove the container boundary. The sandbox probe only runs when this server is set to the Docker runner.</p>
+      <div class="actions">
+        <button type="button" id="drill" class="dark">Run the note filter</button>
+        <button type="button" id="probe">Run the sandbox probe</button>
+      </div>
+      <pre id="drill-out" hidden></pre>
+    </section>
+    <footer>
+      <p>Waiting has not hit the grill. Firing is cooking. Ready is bagged. Overdue is shown in words, not color alone.</p>
+    </footer>
+    <script type="module" src="/kitchen.js"></script>
+  </body>
+</html>
