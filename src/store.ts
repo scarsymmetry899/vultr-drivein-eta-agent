@@ -1,5 +1,8 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { parseTrail, trailForEarlyArrival } from "./decision-trail.ts";
+import type { DecisionTrail } from "./decision-trail.ts";
+import { serviceCue, withAction } from "./service-log.ts";
+import type { ServiceAction } from "./service-log.ts";
 import { ticketPrepMinutes } from "../sandbox/fire-time-solver/solver.ts";
 import { openDatabase } from "./db.ts";
 import { loadConfig, type AppConfig } from "./config.ts";
@@ -269,6 +272,13 @@ export function markHere(id: string): DriveInOrder | undefined {
      SET guest_here = 1, arrived_at = COALESCE(arrived_at, ?), updated_at = ?
      WHERE id = ? AND status IN ('cooking', 'ready')`,
   ).run(stamp, stamp, id);
+  remember(id, {
+    at: stamp,
+    actor: "guest",
+    step: "check_in",
+    result: "unchanged",
+    note: "Checked in again. The fire time stayed where it was.",
+  });
   return getOrder(id);
 }
 
@@ -279,7 +289,17 @@ export function markReady(id: string): { order: DriveInOrder | undefined; change
       `UPDATE drivein_orders SET status = 'ready', updated_at = ? WHERE id = ? AND status = 'cooking'`,
     )
     .run(stamp, id);
-  return { order: getOrder(id), changed: Number(result.changes) === 1 };
+  const changed = Number(result.changes) === 1;
+  if (changed) {
+    remember(id, {
+      at: stamp,
+      actor: "kitchen",
+      step: "ready",
+      result: "done",
+      note: "Marked the bag ready.",
+    });
+  }
+  return { order: getOrder(id), changed };
 }
 
 export function markPickedUp(id: string): { order: DriveInOrder | undefined; changed: boolean } {
@@ -289,7 +309,46 @@ export function markPickedUp(id: string): { order: DriveInOrder | undefined; cha
       `UPDATE drivein_orders SET status = 'completed', updated_at = ? WHERE id = ? AND status = 'ready'`,
     )
     .run(stamp, id);
-  return { order: getOrder(id), changed: Number(result.changes) === 1 };
+  const changed = Number(result.changes) === 1;
+  if (changed) {
+    remember(id, {
+      at: stamp,
+      actor: "kitchen",
+      step: "picked_up",
+      result: "done",
+      note: "Marked the bag picked up.",
+    });
+  }
+  return { order: getOrder(id), changed };
+}
+
+function remember(id: string, action: ServiceAction): void {
+  const order = getOrder(id);
+  if (!order) return;
+  const trail = withAction(order.decision_trail ?? blankTrail(order), action);
+  openDatabase().prepare("UPDATE drivein_orders SET decision_trail = ? WHERE id = ?").run(JSON.stringify(trail), id);
+}
+
+function blankTrail(order: DriveInOrder): DecisionTrail {
+  return {
+    solver: {
+      arrival: order.eta_time,
+      prep_minutes: order.prep_minutes,
+      buffer_minutes: order.buffer_minutes,
+      fire_at: order.kitchen_start_at,
+      ready_by: order.ready_by,
+      decision: "fire",
+      changes: [],
+    },
+    explanation: {
+      mode: "demo",
+      source: "deterministic",
+      live: false,
+      text: "",
+      warning: null,
+    },
+    actions: [],
+  };
 }
 
 export interface BoardCard {
@@ -313,6 +372,9 @@ export interface BoardCard {
   decision_changes: string[];
   /** Planned fire time an early check-in replaced, if any. */
   fire_moved_from: string | null;
+  next_step: string;
+  exception: string | null;
+  last_action: string | null;
 }
 
 export function kitchenBoard(config: AppConfig, now = new Date()): {
@@ -333,7 +395,7 @@ export function kitchenBoard(config: AppConfig, now = new Date()): {
   const firing: BoardCard[] = [];
   const ready: BoardCard[] = [];
   for (const row of rows) {
-    const card = toCard(fromRow(row));
+    const card = toCard(fromRow(row), now);
     if (row.status === "confirmed") waiting.push(card);
     else if (row.status === "cooking") firing.push(card);
     else ready.push(card);
@@ -377,7 +439,15 @@ function pickedUpToday(timeZone: string, now: Date): number {
   return rows.filter((row) => day(new Date(row.updated_at)) === today).length;
 }
 
-function toCard(order: DriveInOrder): BoardCard {
+function toCard(order: DriveInOrder, now: Date): BoardCard {
+  const cue = serviceCue({
+    status: order.status,
+    kitchen_start_at: order.kitchen_start_at,
+    ready_by: order.ready_by,
+    eta_timestamp: order.eta_timestamp,
+    now,
+  });
+  const actions = order.decision_trail?.actions ?? [];
   return {
     id: order.id,
     order_number: order.order_number,
@@ -398,6 +468,9 @@ function toCard(order: DriveInOrder): BoardCard {
     schedule_reason: order.schedule_reason,
     decision_changes: order.decision_trail?.solver.changes ?? [],
     fire_moved_from: order.decision_trail?.solver.previous_fire_at ?? null,
+    next_step: cue.next_step,
+    exception: cue.exception,
+    last_action: actions.length ? actions[actions.length - 1]?.note ?? null : null,
   };
 }
 

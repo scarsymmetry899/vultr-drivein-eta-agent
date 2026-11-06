@@ -172,6 +172,8 @@ test("guest ticket is priced, scheduled, and rushed onto the board", async () =>
     assert.equal(scheduleBody.order.decision_trail.explanation.live, false);
     assert.equal(scheduleBody.order.decision_trail.solver.fire_at, scheduleBody.order.kitchen_start_at);
     assert.equal(scheduleBody.order.decision_trail.solver.ready_by, scheduleBody.order.ready_by);
+    assert.equal(scheduleBody.order.decision_trail.actions[0].actor, "solver");
+    assert.equal(scheduleBody.order.decision_trail.actions[0].step, "schedule");
 
     const locked = await fetch(`${base}/api/kitchen/board`);
     assert.equal(locked.status, 401);
@@ -196,6 +198,8 @@ test("guest ticket is priced, scheduled, and rushed onto the board", async () =>
     assert.match(arrived.order.decision_trail.solver.changes.join(" "), /arrived before the grill/i);
     assert.equal(arrived.order.decision_trail.solver.fire_at, arrived.order.kitchen_start_at);
     assert.equal(arrived.order.decision_trail.explanation.source, "deterministic");
+    assert.equal(arrived.order.decision_trail.actions.at(-1).actor, "guest");
+    assert.equal(arrived.order.decision_trail.actions.at(-1).step, "check_in");
 
     const after = await (await fetch(`${base}/api/kitchen/board`, pit())).json();
     const firing = after.firing.find((card: { id: string }) => card.id === order.id);
@@ -231,10 +235,17 @@ test("guest ticket is priced, scheduled, and rushed onto the board", async () =>
     assert.equal(denied.status, 401);
     const marked = await fetch(`${base}/api/orders/${order.id}/ready`, pit({ method: "POST" }));
     assert.equal(marked.status, 200);
-    assert.equal((await marked.json()).order.status, "ready");
+    const markedBody = await marked.json();
+    assert.equal(markedBody.order.status, "ready");
+    assert.equal(markedBody.order.decision_trail.actions.at(-1).actor, "kitchen");
+    assert.equal(markedBody.order.decision_trail.actions.at(-1).step, "ready");
+    assert.equal(markedBody.order.kitchen_start_at, arrived.order.kitchen_start_at);
     const picked = await fetch(`${base}/api/orders/${order.id}/picked-up`, pit({ method: "POST" }));
     assert.equal(picked.status, 200);
-    assert.equal((await picked.json()).order.status, "completed");
+    const pickedBody = await picked.json();
+    assert.equal(pickedBody.order.status, "completed");
+    assert.equal(pickedBody.order.decision_trail.actions.at(-1).step, "picked_up");
+    assert.equal(pickedBody.order.decision_trail.solver.fire_at, arrived.order.decision_trail.solver.fire_at);
     const closedBoard = await (await fetch(`${base}/api/kitchen/board`, pit())).json();
     assert.equal(closedBoard.picked_up_today, 1);
     assert.ok(closedBoard.sandbox_flags.includes("--network=none"));

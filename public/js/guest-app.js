@@ -1,3 +1,4 @@
+import { presentIsoClocks, serviceFootnote } from "./clocks.js";
 import { foodMark } from "./icons.js";
 
 const CATEGORIES = [
@@ -38,7 +39,10 @@ const state = {
   ticketId: sessionStorage.getItem("route66-ticket-id") || "",
   order: null,
   busy: false,
+  busyAction: "",
+  notice: "",
   error: "",
+  service: null,
   detailQty: 1,
   detailSku: "",
   otherTime: false,
@@ -57,6 +61,12 @@ async function boot() {
   });
   document.addEventListener("click", onNavigate);
   desk.addEventListener("change", render);
+  try {
+    const health = await fetch("/api/health");
+    if (health.ok) state.service = await health.json();
+  } catch {
+    state.service = null;
+  }
   try {
     const response = await fetch("/api/menu");
     if (!response.ok) throw new Error("The menu did not load.");
@@ -704,7 +714,9 @@ function reviewView() {
 }
 
 async function submitOrder(notes) {
+  if (state.busy) return;
   state.busy = true;
+  state.busyAction = "send";
   state.error = "";
   state.draft.notes = notes;
   saveJson("route66-draft", state.draft);
@@ -734,9 +746,11 @@ async function submitOrder(notes) {
     state.draft.notes = "";
     saveJson("route66-draft", state.draft);
     state.busy = false;
+    state.busyAction = "";
     go("/ticket");
   } catch (error) {
     state.busy = false;
+    state.busyAction = "";
     state.error = error instanceof Error ? error.message : "The pit could not take that order.";
     render();
   }
@@ -921,18 +935,21 @@ function stepsCard(order) {
     list.append(item);
   }
   card.append(list);
+  card.append(el("p", "fine", nextStep(order)));
+  if (state.notice) card.append(el("p", "fine", state.notice));
 
   const open = order.status !== "completed" && order.status !== "no_show";
   if (order.status === "confirmed" && !order.kitchen_start_at) {
-    const time = el("button", "btn btn-primary btn-wide", state.busy ? "Timing…" : "Time the grill");
+    const time = el("button", "btn btn-primary btn-wide", state.busyAction === "time" ? "Timing the grill…" : "Time the grill");
     time.type = "button";
     time.disabled = state.busy;
+    time.setAttribute("aria-busy", state.busy ? "true" : "false");
     time.addEventListener("click", () => timeGrill());
     card.append(time);
   }
   if (open && !order.guest_here) {
     const timed = Boolean(order.kitchen_start_at);
-    const here = el("button", `btn ${timed ? "btn-primary" : "btn-dark"} btn-wide`, state.busy ? "Sending…" : "I'm at the stall");
+    const here = el("button", `btn ${timed ? "btn-primary" : "btn-dark"} btn-wide`, state.busyAction === "here" ? "Checking in…" : "I'm at the stall");
     here.type = "button";
     here.disabled = state.busy;
     here.addEventListener("click", () => arrive());
@@ -964,11 +981,19 @@ function decisionPanel(order) {
   box.append(el("h3", "", "What changed"));
   const changes = el("ul", "changes");
   const lines = solver.changes?.length ? solver.changes : ["No extra change was recorded."];
-  for (const change of lines) changes.append(el("li", "", change));
+  for (const change of lines) changes.append(el("li", "", presentIsoClocks(change, lotZone())));
   box.append(changes);
+  if (trail.actions?.length) {
+    box.append(el("h3", "", "Who did what"));
+    const people = el("ul", "changes");
+    for (const action of trail.actions) {
+      people.append(el("li", "", `${actorLabel(action.actor)}: ${presentIsoClocks(action.note, lotZone())}`));
+    }
+    box.append(people);
+  }
   const wording = trail.explanation || {};
   box.append(el("p", "badge", wordingLabel(wording)));
-  if (wording.text) box.append(el("p", "wording", wording.text));
+  if (wording.text) box.append(el("p", "wording", presentIsoClocks(wording.text, lotZone())));
   if (wording.warning) box.append(el("p", "fine", wording.warning));
   box.append(el("p", "fine", "Fire and ready come from the solver. The sentence above does not move those times."));
   return box;
@@ -981,6 +1006,20 @@ function tile(label, value, className, was) {
   return node;
 }
 
+function nextStep(order) {
+  if (order.status === "completed") return "Kitchen staff marked this picked up.";
+  if (order.status === "ready") return "Next: kitchen staff hand you the bag and mark it picked up.";
+  if (order.status === "cooking") return "Next: kitchen staff mark the bag ready. You do not.";
+  if (order.kitchen_start_at) return "Next: the solver fires on its clock, or you check in early.";
+  return "Next: you time the grill. Staff do not set this clock.";
+}
+
+function actorLabel(actor) {
+  if (actor === "kitchen") return "Kitchen staff";
+  if (actor === "guest") return "Guest";
+  return "Solver";
+}
+
 function wordingLabel(wording) {
   if (wording.live && wording.source === "vultr") return `Wording from Vultr Serverless Inference${wording.model ? ` · ${wording.model}` : ""}`;
   if (wording.mode === "live-rejected") return "Model wording discarded. Solver sentence shown.";
@@ -989,8 +1028,11 @@ function wordingLabel(wording) {
 }
 
 async function timeGrill() {
+  if (state.busy) return;
   state.busy = true;
+  state.busyAction = "time";
   state.error = "";
+  state.notice = "Timing the grill. The solver sets the clock first. Wording can take several seconds and does not move that clock.";
   render();
   try {
     const response = await fetch("/api/agent/schedule", {
@@ -999,6 +1041,7 @@ async function timeGrill() {
       body: JSON.stringify({ order_id: state.ticketId }),
     });
     const body = await response.json();
+    if (body.order) state.order = body.order;
     if (!response.ok) throw new Error(body.error || "The pit could not time the grill.");
     if (body.decision?.decision === "refuse") throw new Error(body.decision.reason || "The pit could not time the grill.");
     state.order = body.order;
@@ -1006,13 +1049,18 @@ async function timeGrill() {
     state.error = error instanceof Error ? error.message : "The pit could not time the grill.";
   } finally {
     state.busy = false;
+    state.busyAction = "";
+    state.notice = "";
     render();
   }
 }
 
 async function arrive() {
+  if (state.busy) return;
   state.busy = true;
+  state.busyAction = "here";
   state.error = "";
+  state.notice = "Checking you in. If the grill has not started, the fire time moves to now.";
   render();
   try {
     const response = await fetch(`/api/orders/${state.ticketId}/here`, { method: "POST" });
@@ -1023,6 +1071,8 @@ async function arrive() {
     state.error = error instanceof Error ? error.message : "Could not mark you at the stall.";
   } finally {
     state.busy = false;
+    state.busyAction = "";
+    state.notice = "";
     render();
   }
 }
@@ -1126,7 +1176,7 @@ function sidebar(active) {
     }
   }
   const foot = el("div", "side-foot");
-  foot.append(el("p", "", "Demo lot in Austin. Fire times are calculated on this server. This is not a live model, and we do not take a card."));
+  foot.append(el("p", "", serviceFootnote(state.service)));
   const staff = el("a", "", "Staff");
   staff.href = "/kitchen.html";
   foot.append(staff);
@@ -1162,7 +1212,7 @@ function tab(href, label, active) {
 
 function footnote() {
   const note = el("footer", "footnote");
-  note.append(el("p", "", "Demo lot in Austin. Fire times are calculated on this server. This is not a live model, and we do not take a card."));
+  note.append(el("p", "", serviceFootnote(state.service)));
   const staff = el("a", "", "Staff");
   staff.href = "/kitchen.html";
   note.append(staff);
@@ -1394,8 +1444,10 @@ function austinClock(date) {
 
 function clockShort(iso) {
   if (!iso) return "";
+  const when = new Date(iso);
+  if (Number.isNaN(when.getTime())) return "";
   return new Intl.DateTimeFormat("en-US", { timeZone: lotZone(), hour: "numeric", minute: "2-digit", hour12: true })
-    .formatToParts(new Date(iso))
+    .formatToParts(when)
     .filter((part) => part.type === "hour" || part.type === "minute" || part.type === "literal")
     .map((part) => part.value)
     .join("")
@@ -1432,6 +1484,7 @@ async function refreshOrder() {
     const response = await fetch(`/api/orders/${state.ticketId}`);
     if (!response.ok) return;
     const body = await response.json();
+    if (state.busy) return;
     const changed = JSON.stringify(body.order) !== JSON.stringify(state.order);
     state.order = body.order;
     if (path() === "/ticket" && changed && !state.busy) render();

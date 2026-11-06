@@ -1,6 +1,20 @@
-# Challenge 1 draft — Blast Radius Zero
+# Challenge 2 draft — Future of Work
 
-This file is a draft for the operator. It is not a submission. Do not send it to organizers from this repository.
+This file is a draft for the operator. It is not a submission, a slide deck, or a registration change. Do not send it to organizers from this repository.
+
+The service is rule-based and multi-step. A guest orders. The solver schedules the grill. An early arrival re-times that clock. Kitchen staff mark the bag ready, then picked up. Vultr Serverless Inference may write the sentence. It does not own the clock, the bag, or the handoff. Challenge 1 containment is the boundary around the solver, not a claim that the kitchen is autonomous.
+
+## Narration
+
+One spoken line: the guest sets an arrival, the solver times the grill, a person finishes the bag.
+
+Say who owns each step. The guest times the grill and can check in early. The solver sets fire and ready. Kitchen staff mark ready and picked up. If the bag is overdue or the car is late, say that a person decides and the board will not close the ticket by itself. If the footer names a model, say that reply was accepted by this server process and clears on restart. If the footer says no reply has been accepted yet, do not call the sentence a live model. Pay is at the window. There is no card charge, no labor savings, and no real restaurant.
+
+Do not record until the operator confirms the VM is running the commit that shows Austin time in the model sentence and the mode-aware footer. A video has not been recorded.
+
+## Observed live reply
+
+On 6 Nov 2026 the deployed guest ticket `R66-17299`, Time the grill, returned health `live_call_verified: true`, `live_call_at` `2026-11-06T17:59:23.023Z`, `live_call_model` `deepseek-v4.1-flash-1017`. The badge matched. The sentence still contained `2026-11-06T18:19:00.000Z` and `2026-11-06T18:27:00.000Z`. The tiles were 12:19 PM and 12:27 PM Austin. That observation does not mean the flag is still true after a restart.
 
 Sources:
 
@@ -9,7 +23,7 @@ Sources:
 
 ## What this is
 
-Route 66 Drive-In is a fictional Austin lot. A guest builds a ticket with a plate and an arrival time. The Express app on a Vultr VM stores the order and asks a Docker solver for `fire_at` and `ready_by`. The ticket shows those solver facts, and a separate sentence that is either deterministic demo wording or, only in live mode, a schema-checked summary from Vultr Serverless Inference.
+Route 66 Drive-In is a fictional Austin lot. A guest builds a ticket with a plate and an arrival time. The Express app on a Vultr VM stores the order and asks a Docker solver for `fire_at` and `ready_by`. The ticket shows those solver facts, and a separate sentence that is either deterministic demo wording or, only in live mode, a schema-checked summary from Vultr Serverless Inference. Timestamps inside that sentence are shown in Austin time. The stored fire and ready values stay ISO.
 
 It is not a restaurant, a pilot, or an autonomous kitchen. It does not take payment. It does not claim labor savings.
 
@@ -17,9 +31,9 @@ It is not a restaurant, a pilot, or an autonomous kitchen. It does not take paym
 
 - Public code: this repository.
 - Operator-confirmed VM: `route66-drivein-demo`, `65.20.93.98`, Ubuntu 24.04, Mumbai, 1 vCPU / 2 GB. The operator reported containment checks passing on that VM after the decision-trail update. Later commits are live there only after [`deploy/UPDATE.md`](../deploy/UPDATE.md) is run again.
-- Inference on that VM: `INFERENCE_MODE=demo` until [Turn on live Vultr Inference](../deploy/UPDATE.md#turn-on-live-vultr-inference) passes. `npm run inference:check` is the one-command proof. Health shows `live_call_verified: true` only after an accepted live reply.
-- Containment: verified on a Docker build container on 6 Nov 2026 (probe, killed loop, Docker-down drill, real daemon stop). Re-run on the VM for the video.
-- Containment video: not recorded.
+- Inference on that VM: the operator reported live mode with `deepseek-v4.1-flash-1017`. One guest Time the grill on ticket `R66-17299` observed `live_call_verified: true` at `2026-11-06T17:59:23.023Z`. Health shows that only after an accepted live reply in the current process. A restart clears it.
+- Containment: verified on a Docker build container on 6 Nov 2026 (probe, killed loop, Docker-down drill, real daemon stop). Re-run on the VM when recording.
+- Containment video: not recorded. Do not record until the operator confirms this display fix is what the VM is serving.
 
 ## Limits
 
@@ -34,7 +48,7 @@ It is not a restaurant, a pilot, or an autonomous kitchen. It does not take paym
 
 Story in one line: a guest changes plans, the agent re-times the grill, and hostile input cannot reach the restaurant.
 
-Record after the VM is on the commit you intend to show, with `SANDBOX_RUNNER=docker`. Use `INFERENCE_MODE=live` only if `npm run inference:check` passed on the VM; otherwise say the wording is deterministic. Never show the kitchen token or the inference key.
+Record only after the operator confirms the VM is on the commit you intend to show, with `SANDBOX_RUNNER=docker`. Read the footer before you speak. If it names a model, say the reply was accepted by this process and clears on restart. If it says no reply has been accepted, say the wording is deterministic. Never show the kitchen token or the inference key. Point at the model sentence and confirm the times are Austin clock times, not raw UTC.
 
 **Beat 1 — the agent decides (about 60 s)**
 
@@ -45,7 +59,7 @@ Record after the VM is on the commit you intend to show, with `SANDBOX_RUNNER=do
 **Beat 2 — the guest changes plans (about 30 s)**
 
 4. Tap **I'm at the stall** well before the fire time. The clock flips to On the grill. The Fire and Ready tiles show the old times under the new ones, and What changed reads `fire … → …, ready … → …`.
-5. Desktop window, `kitchen.html`, unlock with the token off camera. The same plate is in Firing with “Rush fire at check-in · planned …”. Mark ready, then Picked up.
+5. Desktop window, `kitchen.html`, unlock with the token off camera. The same plate is in Firing with “Rush fire at check-in · planned …”, the next-step line for kitchen staff, and Who did what on the guest ticket naming the guest check-in. Mark ready, then Picked up. If the status line shows a refusal, leave it on screen. Do not narrate a refused change as saved.
 
 **Beat 3 — nothing escapes (about 60 s)**
 
@@ -58,7 +72,7 @@ If any step does not hold, do not narrate it as containment. Say what failed.
 
 ## Draft submission text
 
-Route 66 Drive-In is a fictional preorder demo for Challenge 1, Blast Radius Zero. The control plane is a Vultr Cloud Compute VM. The guest sets an arrival in America/Chicago. A Docker solver, started with no network, a read-only root, a non-root user, and memory, pid, and CPU limits, returns the grill fire time and the ready time. Those numbers are stored on the ticket. The sentence next to them is labeled as deterministic demo wording. Live Vultr Serverless Inference is wired only to `https://api.vultrinference.com/v1`, schema-checked, and unable to change the fire time. Whether it is turned on in the deployed environment is stated in the video and backed by `evidence/runs/inference-*.json` from `npm run inference:check` on the VM. The public demo URL and the containment recording are attached by the operator after the VM update and the recording steps in this file. This is not a real restaurant and it does not process payments.
+Route 66 Drive-In is a fictional preorder demo for Challenge 2, Future of Work, on the Challenge 1 sandbox. The control plane is a Vultr Cloud Compute VM. The guest sets an arrival in America/Chicago. A Docker solver, started with no network, a read-only root, a non-root user, and memory, pid, and CPU limits, returns the grill fire time and the ready time. Those numbers stay on the ticket. An early check-in re-times them by rule. Kitchen staff mark the bag ready and picked up. Vultr Serverless Inference, wired only to `https://api.vultrinference.com/v1`, may supply the sentence. It is schema-checked and cannot change the fire time. One deployed Time the grill on ticket R66-17299 accepted deepseek-v4.1-flash-1017 at 2026-11-06T17:59:23.023Z. That check is process memory and clears on restart. The public demo URL and any recording are attached by the operator after they confirm the VM is on the commit they mean to show. This is not a real restaurant, it does not process payments, and it does not claim labor savings.
 
 Code: this repository.
 Event: https://lablab.ai/ai-hackathons/vultr-hackathon

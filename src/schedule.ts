@@ -11,6 +11,7 @@ import {
   setScheduleReason,
 } from "./store.ts";
 import { trailFromSchedule } from "./decision-trail.ts";
+import { shareFlight } from "./service-log.ts";
 import { HOSTILE_DEMO_INPUT, SAMPLE_INPUT } from "../sandbox/fire-time-solver/solver.ts";
 import type { SolveResult } from "../sandbox/fire-time-solver/types.ts";
 import type { DriveInOrder } from "./types.ts";
@@ -27,7 +28,15 @@ export interface ScheduleResponse {
 }
 
 /** Compute fire_at for one stored order. The inference call explains; it does not set the clock. */
-export async function scheduleOrder(
+export function scheduleOrder(
+  orderId: string,
+  config: AppConfig,
+  utterance?: string,
+): Promise<ScheduleResponse | { error: string; status: number }> {
+  return shareFlight(orderId, () => scheduleOrderOnce(orderId, config, utterance));
+}
+
+async function scheduleOrderOnce(
   orderId: string,
   config: AppConfig,
   utterance?: string,

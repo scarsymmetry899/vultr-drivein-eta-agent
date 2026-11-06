@@ -48,22 +48,22 @@
       <main class="board" id="board" hidden>
         <section class="lane" aria-labelledby="lane-waiting">
           <h2 id="lane-waiting">Waiting<span id="count-waiting">0</span></h2>
-          <p class="lane-note">Not on the grill. The agent fires at the solver's time.</p>
+          <p class="lane-note">Not on the grill. The guest or the solver owns the clock. Staff do not type a fire time.</p>
           <div id="waiting"></div>
         </section>
         <section class="lane firing" aria-labelledby="lane-firing">
           <h2 id="lane-firing">Firing<span id="count-firing">0</span></h2>
-          <p class="lane-note">On the grill now.</p>
+          <p class="lane-note">On the grill. Kitchen staff mark ready only when the bag is actually ready.</p>
           <div id="firing"></div>
         </section>
         <section class="lane ready" aria-labelledby="lane-ready">
           <h2 id="lane-ready">Ready<span id="count-ready">0</span></h2>
-          <p class="lane-note">Bagged. Walk it to the plate.</p>
+          <p class="lane-note">Bagged. Kitchen staff hand it off, then mark it picked up.</p>
           <div id="ready"></div>
         </section>
       </main>
       <footer class="pit-foot" id="pit-foot" hidden>
-        <p>Waiting has not hit the grill. Firing is cooking. Ready is bagged. Overdue is shown in words, not color alone.</p>
+        <p>Waiting has not hit the grill. Firing is cooking. Ready is bagged. An overdue or late car stays on the card until a person acts. The board does not close it by itself.</p>
       </footer>
 
       <section class="syscheck" id="syscheck" aria-labelledby="sys-title" hidden>

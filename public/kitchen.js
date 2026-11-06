@@ -1,3 +1,5 @@
+import { presentIsoClocks } from "./js/clocks.js";
+
 const $ = (selector) => document.querySelector(selector);
 const authForm = $("#kitchen-auth");
 const board = $("#board");
@@ -46,8 +48,10 @@ function showBoard(open) {
 
 function short(iso) {
   if (!iso) return "—";
+  const when = new Date(iso);
+  if (Number.isNaN(when.getTime())) return "—";
   return new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", minute: "2-digit", hour12: true })
-    .formatToParts(new Date(iso))
+    .formatToParts(when)
     .filter((part) => part.type === "hour" || part.type === "minute" || part.type === "literal")
     .map((part) => part.value)
     .join("")
@@ -154,6 +158,9 @@ function renderCard(card, now) {
     button.addEventListener("click", () => postStatus(card.id, "picked-up", button));
     article.append(button);
   }
+  if (card.next_step) article.append(node("p", "tc-owner", card.next_step));
+  if (card.exception) article.append(node("p", "tc-note", card.exception));
+  if (card.last_action) article.append(node("p", "tc-owner", presentIsoClocks(card.last_action, timeZone)));
   return article;
 }
 
@@ -168,21 +175,32 @@ function renderLane(key, cards, now, emptyText) {
 }
 
 async function postStatus(id, action, button) {
+  if (button.disabled) return;
   const original = button.textContent;
   button.disabled = true;
   button.textContent = "Saving…";
+  button.setAttribute("aria-busy", "true");
+  let refused = "";
   try {
     const response = await kitchenFetch(`/api/orders/${id}/${action}`, { method: "POST" });
     if (!response.ok) {
-      const body = await response.json();
-      statusLine.textContent = body.error || "That status change was refused.";
+      const body = await response.json().catch(() => ({}));
+      refused = body.error || "That status change was refused.";
     }
-    await refresh();
   } catch {
-    statusLine.textContent = "The board could not save that change.";
+    statusLine.textContent = "The board could not reach the server. The change was not confirmed.";
     button.disabled = false;
     button.textContent = original;
+    button.removeAttribute("aria-busy");
+    return;
   }
+  try {
+    await refresh();
+  } catch {
+    statusLine.textContent = refused || "The change was sent, and the board did not reload.";
+    return;
+  }
+  if (refused) statusLine.textContent = refused;
 }
 
 async function refresh() {

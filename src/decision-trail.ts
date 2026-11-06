@@ -1,5 +1,6 @@
 import type { Explanation } from "../agent/inference.ts";
 import type { SolveResult } from "../sandbox/fire-time-solver/types.ts";
+import type { ServiceAction } from "./service-log.ts";
 
 /** Numbers come from the solver. Wording is separate and may be demo text or a checked model sentence. */
 export interface DecisionTrail {
@@ -24,6 +25,7 @@ export interface DecisionTrail {
     text: string;
     warning: string | null;
   };
+  actions?: ServiceAction[];
 }
 
 export function trailFromSchedule(input: {
@@ -48,6 +50,18 @@ export function trailFromSchedule(input: {
       decision: input.decision.decision,
       changes,
     },
+    actions: [
+      {
+        at: new Date().toISOString(),
+        actor: "solver",
+        step: input.decision.decision === "refuse" || !input.decision.fire_at ? "refused" : "schedule",
+        result: input.decision.decision === "refuse" || !input.decision.fire_at ? "refused" : "done",
+        note:
+          input.decision.decision === "refuse" || !input.decision.fire_at
+            ? "Refused the ticket. The fire time was not set. Kitchen staff do not override that clock."
+            : "Set the fire time. Kitchen staff do not type this clock.",
+      },
+    ],
     explanation: {
       mode: input.explanation.mode,
       source: input.explanation.source,
@@ -103,6 +117,15 @@ export function trailForEarlyArrival(input: {
       previous_ready_by: input.previousReady,
       arrived_at: input.fireAt,
     },
+    actions: [
+      {
+        at: input.fireAt,
+        actor: "guest",
+        step: "check_in",
+        result: "done",
+        note: "Checked in early. The check-in rule moved the fire time. Kitchen staff now own the bag.",
+      },
+    ],
     explanation: {
       mode: "demo",
       source: "deterministic",
