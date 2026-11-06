@@ -9,7 +9,8 @@ Group=docker
 WorkingDirectory=/opt/route66
 EnvironmentFile=/opt/route66/.env
 Environment=NODE_OPTIONS=--experimental-sqlite
-ExecStart=/usr/bin/npm start
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/local/bin/npm start
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true

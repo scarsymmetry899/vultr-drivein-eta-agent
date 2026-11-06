@@ -105,9 +105,13 @@ timeout 5s docker run --rm -i \
 
 Then set `SANDBOX_RUNNER=docker` in `.env` if the API should dispatch into that image. A failed container does not schedule the ticket. The boundary probe is `bash scripts/containment-demo.sh`. See [`docs/CONTAINMENT.md`](docs/CONTAINMENT.md).
 
-## Deploy on a Vultr VM
+## Deploy on the existing Vultr VM
 
-Not done in this repository. Follow [`deploy/RUNBOOK.md`](deploy/RUNBOOK.md). The demo lot pin in `.env.example` is `30.2500`, `-97.7490` (South Congress, Austin). It is a map pin for the story, not a business listing.
+Not done yet. The machine is `route66-drivein-demo` at `65.20.93.98`. After this change is on `main`, paste the root console command in [`deploy/READINESS.md`](deploy/READINESS.md). It installs Node 22 and Docker, builds the solver image, keeps SQLite on disk, runs demo inference (no API key), and locks the kitchen behind a token generated on the VM.
+
+The pit board is not public. Guest ordering is. Staff actions and the list of plates need `X-Kitchen-Token`.
+
+The demo lot pin in `.env.example` is `30.2500`, `-97.7490` (South Congress, Austin). It is a map pin for the story, not a business listing.
 
 Guest pages are mobile-first: menu, bag, plate, arrival time, then a ticket with **I'm at the stall**. There is no account and no card charge. The kitchen is a separate high-contrast board with Waiting, Firing, and Ready, plus text labels for overdue tickets.
 

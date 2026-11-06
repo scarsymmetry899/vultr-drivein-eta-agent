@@ -11,7 +11,14 @@ import { createApp } from "./server.ts";
 delete process.env.VULTR_INFERENCE_API_KEY;
 process.env.SANDBOX_RUNNER = "inprocess";
 process.env.INFERENCE_MODE = "demo";
+process.env.KITCHEN_TOKEN = "test-kitchen-token";
 process.env.DATABASE_PATH = join(mkdtempSync(join(tmpdir(), "r66-")), "orders.sqlite");
+
+function pit(init: RequestInit = {}): RequestInit {
+  const headers = new Headers(init.headers);
+  headers.set("x-kitchen-token", "test-kitchen-token");
+  return { ...init, headers };
+}
 
 function chicagoMinutes(date: Date): number {
   const formatter = new Intl.DateTimeFormat("en-US", {
@@ -136,7 +143,9 @@ test("guest ticket is priced, scheduled, and rushed onto the board", async () =>
     assert.equal(scheduleBody.decision.host_effects, "none");
     assert.ok(scheduleBody.order.kitchen_start_at);
 
-    const before = await (await fetch(`${base}/api/kitchen/board`)).json();
+    const locked = await fetch(`${base}/api/kitchen/board`);
+    assert.equal(locked.status, 401);
+    const before = await (await fetch(`${base}/api/kitchen/board`, pit())).json();
     assert.ok(before.waiting.some((card: { id: string }) => card.id === order.id));
 
     const here = await fetch(`${base}/api/orders/${order.id}/here`, { method: "POST" });
@@ -155,23 +164,23 @@ test("guest ticket is priced, scheduled, and rushed onto the board", async () =>
     assert.equal(againBody.order.status, "cooking");
     assert.equal(againBody.order.kitchen_start_at, arrived.order.kitchen_start_at);
 
-    const after = await (await fetch(`${base}/api/kitchen/board`)).json();
+    const after = await (await fetch(`${base}/api/kitchen/board`, pit())).json();
     const firing = after.firing.find((card: { id: string }) => card.id === order.id);
     assert.ok(firing);
     assert.equal(firing.guest_here, true);
     assert.equal(after.waiting.some((card: { id: string }) => card.id === order.id), false);
 
-    const drill = await fetch(`${base}/api/agent/schedule`, {
+    const drill = await fetch(`${base}/api/agent/schedule`, pit({
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ containment_drill: true }),
-    });
+    }));
     const drillBody = await drill.json();
     assert.equal(drillBody.decision.containment, "hostile-refused");
     assert.equal(drillBody.decision.contained, true);
     assert.equal(drillBody.decision.executed_payload, false);
     assert.equal(drillBody.order, null);
-    const stillThere = await (await fetch(`${base}/api/kitchen/board`)).json();
+    const stillThere = await (await fetch(`${base}/api/kitchen/board`, pit())).json();
     assert.ok(stillThere.firing.some((card: { id: string }) => card.id === order.id));
 
     const health = await (await fetch(`${base}/api/health`)).json();
@@ -179,17 +188,20 @@ test("guest ticket is priced, scheduled, and rushed onto the board", async () =>
     assert.equal(health.inference_mode, "demo");
     assert.equal(health.isolation, "none");
     assert.equal(health.fail_closed, false);
+    assert.equal(health.kitchen_auth, true);
 
-    const tooSoon = await fetch(`${base}/api/orders/${order.id}/picked-up`, { method: "POST" });
+    const tooSoon = await fetch(`${base}/api/orders/${order.id}/picked-up`, pit({ method: "POST" }));
     assert.equal(tooSoon.status, 409);
-    const marked = await fetch(`${base}/api/orders/${order.id}/ready`, { method: "POST" });
+    const denied = await fetch(`${base}/api/orders/${order.id}/ready`, { method: "POST" });
+    assert.equal(denied.status, 401);
+    const marked = await fetch(`${base}/api/orders/${order.id}/ready`, pit({ method: "POST" }));
     assert.equal(marked.status, 200);
     assert.equal((await marked.json()).order.status, "ready");
-    const picked = await fetch(`${base}/api/orders/${order.id}/picked-up`, { method: "POST" });
+    const picked = await fetch(`${base}/api/orders/${order.id}/picked-up`, pit({ method: "POST" }));
     assert.equal(picked.status, 200);
     assert.equal((await picked.json()).order.status, "completed");
 
-    const probe = await fetch(`${base}/api/agent/containment`, { method: "POST" });
+    const probe = await fetch(`${base}/api/agent/containment`, pit({ method: "POST" }));
     assert.equal(probe.status, 200);
     const probeBody = await probe.json();
     assert.equal(probeBody.verified, false);
