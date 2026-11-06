@@ -1,8 +1,8 @@
 # Vultr VM runbook
 
-The VM `route66-drivein-demo` (`65.20.93.98`) already exists. Do not create another one from this repo.
+The VM `route66-drivein-demo` (`65.20.93.98`) already exists. Do not create another one from this repo. Do not re-run [`browser-console.sh`](browser-console.sh). It rewrites `.env`. Updates go through [`UPDATE.md`](UPDATE.md).
 
-For that machine, use the browser console and [`browser-console.sh`](browser-console.sh). The checklist is [`READINESS.md`](READINESS.md). Nothing here has been run on that VM yet.
+The operator reports that VM is serving commit `3bdfb827e00e01f4ac3de68efb077a3e0facd6fc`, with live inference wording on model `deepseek-v4.1-flash-1017`. `live_call_verified` is true only after an accepted reply in the current process. The install steps below are the original recipe, not a second install.
 
 The steps below are the same install, spelled out. The script is the one to paste.
 
@@ -11,7 +11,7 @@ The steps below are the same install, spelled out. The script is the one to past
 - A Vultr Cloud Compute VM (Ubuntu LTS) you create yourself.
 - Node.js 22 and Docker Engine on that VM.
 - A `.env` that stays on the VM. Start from `.env.example`.
-- For live copy only: `INFERENCE_MODE=live`, `VULTR_INFERENCE_API_KEY`, and `VULTR_INFERENCE_MODEL` from the [inference docs](https://docs.vultr.com/vultr-inference-api). Leave `INFERENCE_MODE=demo` until those exist.
+- For live copy only: `INFERENCE_MODE=live`, `VULTR_INFERENCE_API_KEY`, and `VULTR_INFERENCE_MODEL` from the [inference docs](https://docs.vultr.com/vultr-inference-api). On a new machine, leave `INFERENCE_MODE=demo` until those exist. The existing VM already has live mode set by the operator. The key stays on that machine.
 
 The inference key is read by the API process. It is not copied into the solver image, not passed with `docker -e`, and not returned by `/api/health`.
 

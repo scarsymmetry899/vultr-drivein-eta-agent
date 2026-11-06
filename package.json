@@ -2,7 +2,7 @@
   "name": "route66-drivein-eta",
   "version": "0.1.0",
   "private": true,
-  "description": "Route 66 Drive-In \u2014 US order-on-the-go ETA agent for Vultr Agent Rush Challenge 1.",
+  "description": "Fictional Austin drive-in service workflow for Vultr Agent Rush Challenge 2, Future of Work. The solver times the grill. Optional Vultr inference only writes the sentence.",
   "type": "module",
   "engines": {
     "node": ">=22"

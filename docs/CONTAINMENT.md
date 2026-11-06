@@ -1,6 +1,6 @@
 # Containment demo script
 
-Use this when recording the Challenge 1 video. Say what the shot actually proves.
+Use this when a recording needs the sandbox boundary. That boundary is how the Challenge 2 service runs the solver. The shot proves the container, not a finished submission. A video has not been recorded. Say what the shot actually proves.
 
 ## 1. Note filter, on a laptop
 
