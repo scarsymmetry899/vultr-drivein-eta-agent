@@ -99,7 +99,7 @@ function renderMenu() {
   } else {
     const head = el("div", "screen-head");
     head.append(el("p", "kicker", "Austin"), el("h1", "display", "Order ahead"));
-    head.append(el("p", "lede", `Open ${state.menu.open}–${state.menu.close}. Pull up when you are close. Pay at the window.`));
+    head.append(el("p", "lede", `Open ${hoursLabel()}. Pull up when you are close. Pay at the window.`));
     main.append(head);
     const chips = el("div", "chips", "");
     chips.setAttribute("role", "tablist");
@@ -279,22 +279,40 @@ function renderCheckout(step) {
 
 function arrivalForm() {
   const form = el("form", "stack");
-  form.append(el("p", "lede", "When should the bag be ready?"));
-  const label = el("label", "", "Arrival time");
+  form.append(el("p", "lede", "When will you pull in?"));
+  const label = el("label", "", "Your local time");
   label.setAttribute("for", "eta");
   const input = document.createElement("input");
   input.id = "eta";
   input.type = "datetime-local";
   input.required = true;
   input.value = state.draft.eta || defaultEta();
-  form.append(label, input);
-  if (state.menu) form.append(el("p", "quiet", `The lot is open ${state.menu.open}–${state.menu.close} ${state.menu.timezone}.`));
+  const preview = el("p", "quiet", "");
+  preview.id = "austin-preview";
+  const paint = () => {
+    preview.textContent = arrivalPreview(input.value);
+  };
+  input.addEventListener("input", paint);
+  form.append(label, input, preview);
+  paint();
   const button = el("button", "primary wide", "Continue");
   button.type = "submit";
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     state.draft.eta = input.value;
     saveJson("route66-draft", state.draft);
+    const when = new Date(input.value);
+    if (Number.isNaN(when.getTime())) {
+      state.error = "Enter an arrival time.";
+      render();
+      return;
+    }
+    if (outsideAustinHours(when)) {
+      state.error = `${austinLabel(when)} is outside Austin lot hours (${hoursLabel()}). Pick a time while the lot is open.`;
+      render();
+      return;
+    }
+    state.error = "";
     go("/checkout/vehicle");
   });
   form.append(button);
@@ -355,7 +373,9 @@ function reviewForm() {
   }
   wrap.append(lineRow("Food", usd(subtotalCents())));
   wrap.append(el("p", "quiet", "Sales tax is calculated by the pit. Pay at the window. We do not take a card in this demo."));
-  wrap.append(lineRow("Arrive", state.draft.eta ? new Date(state.draft.eta).toLocaleString("en-US", { hour: "numeric", minute: "2-digit", month: "short", day: "numeric" }) : "Not set"));
+  const when = state.draft.eta ? new Date(state.draft.eta) : null;
+  wrap.append(lineRow("Your time", when && !Number.isNaN(when.getTime()) ? localLabel(when) : "Not set"));
+  wrap.append(lineRow("Austin time", when && !Number.isNaN(when.getTime()) ? austinLabel(when) : "Not set"));
   wrap.append(lineRow("Car", `${state.draft.color || ""} ${state.draft.plate || ""}`.trim()));
   const noteLabel = el("label", "", "Note for the pit");
   noteLabel.setAttribute("for", "notes");
@@ -430,7 +450,7 @@ function renderTicket() {
     main.append(el("p", "plate-lg", order.car_plate));
     main.append(el("p", "lede", order.items.map((item) => `${item.qty} × ${item.name}`).join(", ")));
     main.append(el("p", "price", `${usd(order.subtotal_cents)} + ${usd(order.sales_tax_cents)} tax = ${usd(order.grand_total_cents)}`));
-    main.append(el("p", "quiet", "Pay at the window."));
+    main.append(el("p", "quiet", `Arrival at the lot: ${order.eta_time}. Ticket times are Austin time. Pay at the window.`));
     main.append(timeline(order));
     if (state.error) main.append(el("p", "alert", state.error));
     const bar = el("div", "action-bar");
@@ -751,6 +771,75 @@ function subtotalCents() {
 
 function usd(cents) {
   return money.format(cents / 100);
+}
+
+function lotZone() {
+  return state.menu?.timezone || "America/Chicago";
+}
+
+function hoursLabel() {
+  const open = state.menu?.open || "11:00";
+  const close = state.menu?.close || "22:00";
+  return `${plainClock(open)}–${plainClock(close)} Austin time`;
+}
+
+function plainClock(hhmm) {
+  const [hour, minute] = hhmm.split(":").map(Number);
+  const suffix = hour >= 12 ? "PM" : "AM";
+  const h12 = hour % 12 || 12;
+  return `${h12}:${String(minute).padStart(2, "0")} ${suffix}`;
+}
+
+function austinMinutes(date) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: lotZone(),
+    hourCycle: "h23",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const bag = {};
+  for (const part of formatter.formatToParts(date)) {
+    if (part.type !== "literal") bag[part.type] = part.value;
+  }
+  const hour = bag.hour === "24" ? 0 : Number(bag.hour);
+  return hour * 60 + Number(bag.minute);
+}
+
+function outsideAustinHours(date) {
+  const [openH, openM] = (state.menu?.open || "11:00").split(":").map(Number);
+  const [closeH, closeM] = (state.menu?.close || "22:00").split(":").map(Number);
+  const minutes = austinMinutes(date);
+  return minutes < openH * 60 + openM || minutes > closeH * 60 + closeM;
+}
+
+function localLabel(date) {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  }).format(date);
+}
+
+function austinLabel(date) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: lotZone(),
+    weekday: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  }).format(date);
+}
+
+function arrivalPreview(value) {
+  const when = new Date(value);
+  if (!value || Number.isNaN(when.getTime())) return `The clock above is your local time. The lot is open ${hoursLabel()}.`;
+  const austin = austinLabel(when);
+  const yours = localLabel(when);
+  if (outsideAustinHours(when)) {
+    return `Your time ${yours} is ${austin} in Austin. The lot is closed then. Open ${hoursLabel()}.`;
+  }
+  return `Your time ${yours} is ${austin} in Austin. The lot is open then (${hoursLabel()}).`;
 }
 
 function clock(iso) {
