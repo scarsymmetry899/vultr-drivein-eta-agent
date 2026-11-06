@@ -81,6 +81,9 @@ unset KEY MODELS_JSON
 echo "Saved the key and model ($MODEL) to $ENV_FILE."
 
 echo "Making one live call…"
+# The check writes evidence/runs/*.json as the app user. Earlier root runs can leave that folder root-owned.
+mkdir -p "$APP_DIR/evidence/runs"
+chown -R "$APP_USER:$APP_USER" "$APP_DIR/evidence"
 set +e
 (cd "$APP_DIR" && sudo -u "$APP_USER" env PATH=/usr/local/bin:/usr/bin:/bin npm run -s inference:check)
 CHECK=$?
