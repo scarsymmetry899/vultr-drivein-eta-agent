@@ -35,6 +35,15 @@ function chicagoMinutes(date: Date): number {
   return hour * 60 + Number(bag.minute);
 }
 
+function closedEta(now = new Date()): string {
+  for (let minutes = 30; minutes <= 16 * 60; minutes += 15) {
+    const candidate = new Date(now.getTime() + minutes * 60_000);
+    const clock = chicagoMinutes(candidate);
+    if (clock >= 22 * 60 + 30 || clock < 11 * 60) return candidate.toISOString();
+  }
+  throw new Error("Could not find a closed arrival slot.");
+}
+
 /** An arrival inside the demo open window, far enough out that the fire stays in the future. */
 function futureEta(now = new Date()): string {
   for (let minutes = 50; minutes <= 17 * 60; minutes += 15) {
@@ -62,6 +71,20 @@ test("guest ticket is priced, scheduled, and rushed onto the board", async () =>
     assert.match(await cartPage.text(), /guest-app.js/);
     const kitchenPage = await fetch(`${base}/kitchen.html`);
     assert.match(await kitchenPage.text(), /Kitchen/);
+
+    const closed = await fetch(`${base}/api/orders`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        customer_name: "Mina Cole",
+        car_plate: "TX-4400",
+        car_color: "blue",
+        eta: closedEta(),
+        items: [{ sku: "classic-burger", qty: 1 }],
+      }),
+    });
+    assert.equal(closed.status, 400);
+    assert.match((await closed.json()).error, /outside open hours/);
 
     const menu = await (await fetch(`${base}/api/menu`)).json();
     const rings = menu.items.find((item: { sku: string }) => item.sku === "onion-rings");

@@ -1,6 +1,6 @@
 import type { AppConfig } from "./config.ts";
 import { findMenuItem } from "./menu.ts";
-import { matchHostile } from "../sandbox/fire-time-solver/solver.ts";
+import { describeArrivalHours, matchHostile } from "../sandbox/fire-time-solver/solver.ts";
 import { unavailableBySku } from "./store.ts";
 import type { NewOrderInput, OrderItem } from "./types.ts";
 
@@ -27,11 +27,18 @@ export function parseOrderBody(body: unknown, config: AppConfig, now = new Date(
 
   const etaRaw = record.eta ?? record.eta_timestamp;
   if (typeof etaRaw !== "string") return { error: "An arrival time is required." };
+  if (!/(?:Z|[+-]\d{2}:\d{2})$/.test(etaRaw.trim())) {
+    return { error: "Arrival time must include a timezone offset." };
+  }
   const eta = new Date(etaRaw);
   if (Number.isNaN(eta.getTime())) return { error: "Arrival time must be a timestamp." };
   const skewMs = 18 * 60 * 60 * 1000;
   if (eta.getTime() < now.getTime() - 5 * 60_000) return { error: "That arrival time is already in the past." };
   if (eta.getTime() > now.getTime() + skewMs) return { error: "Arrival time must be within 18 hours." };
+  const hours = describeArrivalHours(eta, config.open, config.close, config.timezone);
+  if (!hours.ok) {
+    return { error: `${hours.reason} The lot hours are Austin time, not the time on your phone.` };
+  }
 
   const lines = readLines(record.items);
   if ("error" in lines) return lines;

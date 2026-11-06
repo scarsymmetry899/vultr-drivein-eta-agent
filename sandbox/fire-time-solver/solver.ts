@@ -107,6 +107,37 @@ export function ticketPrepMinutes(items: SolverItem[]): number {
   return prep;
 }
 
+/**
+ * Lot hours are wall-clock times in `timeZone` on the arrival's calendar day.
+ * 11:00 and 22:00 are Austin hours, not the guest's phone hours.
+ * Exactly at open or close is inside. One minute outside is not.
+ */
+export function describeArrivalHours(
+  eta: Date,
+  open: string,
+  close: string,
+  timeZone: string,
+): { ok: true; label: string } | { ok: false; reason: string } {
+  if (Number.isNaN(eta.getTime())) return { ok: false, reason: "Enter an arrival time." };
+  let window: { open: Date; close: Date };
+  try {
+    window = wallClockWindow(eta, open, close, timeZone);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not read open hours.";
+    return { ok: false, reason: message };
+  }
+  const label = formatClock(eta, timeZone);
+  const openLabel = formatClock(window.open, timeZone);
+  const closeLabel = formatClock(window.close, timeZone);
+  if (eta.getTime() < window.open.getTime() || eta.getTime() > window.close.getTime()) {
+    return {
+      ok: false,
+      reason: `Arrival ${label} is outside open hours (${openLabel}–${closeLabel}).`,
+    };
+  }
+  return { ok: true, label };
+}
+
 export function solveFireTime(input: SolveInput): SolveResult {
   if (input === null || typeof input !== "object") {
     return rejected("Solver input must be an object.", 0, 0, []);
@@ -154,15 +185,8 @@ export function solveFireTime(input: SolveInput): SolveResult {
   const active = readActiveFires(input.active_fires ?? [], warnings);
   const openLabel = formatClock(open, input.timezone);
   const closeLabel = formatClock(close, input.timezone);
-
-  if (eta.getTime() < open.getTime() || eta.getTime() > close.getTime()) {
-    return rejected(
-      `Arrival ${formatClock(eta, input.timezone)} is outside open hours (${openLabel}–${closeLabel}).`,
-      prep,
-      buffer,
-      warnings,
-    );
-  }
+  const hours = describeArrivalHours(eta, input.open, input.close, input.timezone);
+  if (!hours.ok) return rejected(hours.reason, prep, buffer, warnings);
 
   let fire = addMinutes(eta, -(prep + buffer));
   let ready = addMinutes(fire, prep);
