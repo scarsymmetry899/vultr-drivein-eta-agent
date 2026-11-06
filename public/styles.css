@@ -1012,6 +1012,7 @@ body.pit .skip:focus { left: 16px; top: 16px; background: var(--pit-ink); color:
 .tc-plate { margin: 4px 0 2px; font-family: var(--plate); font-weight: 600; font-size: 34px; letter-spacing: 0.05em; line-height: 1.1; overflow-wrap: anywhere; }
 .tc-items { margin: 0; font-size: 14px; line-height: 1.4; }
 .tc-note { margin: 8px 0 0; padding: 6px 10px; border-radius: 10px; background: #f8e9df; font-size: 13px; }
+.tc-owner { margin: 8px 0 0; font-size: 13px; line-height: 1.35; color: #5c5148; }
 .tc-bar { margin-top: 10px; height: 6px; border-radius: 3px; background: #efe6d9; overflow: hidden; }
 .tc-bar div { height: 100%; background: linear-gradient(90deg, #9c2f24, #e0a74a); border-radius: 3px; transition: width 0.5s; }
 .tc-times { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
