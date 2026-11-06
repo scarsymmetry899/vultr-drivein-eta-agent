@@ -34,6 +34,18 @@ On startup the app adds `decision_trail` to an existing SQLite file if that colu
 
 The key belongs only in `/opt/route66/.env` on the VM. It is never in git, never in the browser, and never passed into the sandbox. Do not paste it into a chat or a screen recording.
 
+### Easiest: one command over SSH
+
+The Vultr browser console does not paste reliably, so do this from your own computer's terminal (macOS Terminal, or Windows PowerShell; both have `ssh`). The root password is on the server's Overview page in the Vultr dashboard.
+
+```bash
+ssh -t root@65.20.93.98 "cd /opt/route66 && sudo -u route66 git pull --ff-only origin main && bash scripts/set-inference.sh"
+```
+
+It asks for the key with hidden input (paste, then Enter; nothing shows), lists the models the key can use, saves both to `.env` without changing its owner or mode, makes one live call, switches `INFERENCE_MODE=live` only if that call verified, and restarts the service. If the call fails it leaves `demo` on and prints why.
+
+### By hand
+
 1. In the Vultr console, open Serverless Inference and copy the API key.
 2. On the VM, as root: `nano /opt/route66/.env` and set `VULTR_INFERENCE_API_KEY=` to the key. Leave `INFERENCE_MODE=demo` for now.
 3. List the models the key can use, then set one:

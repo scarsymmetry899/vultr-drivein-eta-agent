@@ -126,7 +126,7 @@ Three proofs, each with a command and a kitchen button. The kitchen buttons need
 | Scheduling stops when the sandbox is gone | stop Docker, then time a grill: HTTP 503, ticket stays `confirmed` | **Run the Docker-down drill** points the docker CLI at a missing daemon and runs the real solver path |
 | Live Vultr Inference answers | `npm run inference:check` | chip `live_call_verified true · <model>` |
 
-`npm run inference:check` reads the key and model from `.env`, never prints the key, and writes `evidence/runs/inference-<stamp>.json`. With no model set it lists the models the key can use. If the model rejects `json_schema` output, the app asks once more for plain JSON and still schema-checks the reply.
+`bash scripts/set-inference.sh` (as root on the VM, ideally over SSH) asks for the key with hidden input, lets you pick a model, saves both, runs the check, and turns live mode on only if it passed. `npm run inference:check` reads the key and model from `.env`, never prints the key, and writes `evidence/runs/inference-<stamp>.json`. With no model set it lists the models the key can use. If the model rejects `json_schema` output, the app asks once more for plain JSON and still schema-checks the reply.
 
 ## Environment
 
