@@ -124,3 +124,10 @@ test("a live reply that passes the schema marks the live call verified; json_sch
   delete process.env.VULTR_INFERENCE_MODEL;
   process.env.INFERENCE_MODE = "demo";
 });
+
+test("JSON wrapped in prose or a think block is accepted; the schema still applies", () => {
+  assert.equal(acceptExplanation('<think>checking the times</think>\n{"summary":"Fire at 5:59 PM CST."}').ok, true);
+  assert.equal(acceptExplanation('Here you go: {"summary":"Fire at 5:59 PM CST."} Hope that helps.').ok, true);
+  assert.equal(acceptExplanation('Here you go: {"summary":"ok","extra":"nope"}').ok, false);
+  assert.equal(acceptExplanation("Fire at 5:59 PM CST, no JSON here.").ok, false);
+});
