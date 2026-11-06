@@ -319,6 +319,8 @@ export function kitchenBoard(config: AppConfig, now = new Date()): {
   waiting: BoardCard[];
   firing: BoardCard[];
   ready: BoardCard[];
+  picked_up_today: number;
+  sandbox_flags: string[];
 } {
   promote(now);
   const rows = openDatabase()
@@ -346,7 +348,30 @@ export function kitchenBoard(config: AppConfig, now = new Date()): {
     waiting,
     firing,
     ready,
+    picked_up_today: pickedUpToday(config.timezone, now),
+    sandbox_flags: [
+      "--network=none",
+      "--read-only",
+      "--cap-drop=ALL",
+      "no-new-privileges",
+      `--memory=${config.sandboxMemory}`,
+      `--pids-limit=${config.sandboxPids}`,
+      `--cpus=${config.sandboxCpus}`,
+      "--user node",
+    ],
   };
+}
+
+/** Tickets closed as picked up on the lot's calendar day. */
+function pickedUpToday(timeZone: string, now: Date): number {
+  const day = (value: Date) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(value);
+  const today = day(now);
+  const since = new Date(now.getTime() - 26 * 3_600_000).toISOString();
+  const rows = openDatabase()
+    .prepare(`SELECT updated_at FROM drivein_orders WHERE status = 'completed' AND updated_at >= ?`)
+    .all(since) as unknown as { updated_at: string }[];
+  return rows.filter((row) => day(new Date(row.updated_at)) === today).length;
 }
 
 function toCard(order: DriveInOrder): BoardCard {

@@ -4,60 +4,95 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Kitchen — Route 66 Drive-In</title>
+    <meta name="theme-color" content="#12100e" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=JetBrains+Mono:wght@400;600&display=swap" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body class="pit">
     <a class="skip" href="#board">Skip to the board</a>
-    <header class="top">
-      <div class="brand">
-        <span class="shield" aria-hidden="true">66</span>
-        <div>
-          <p class="eyebrow">Pit · Austin</p>
-          <h1>Kitchen</h1>
+    <div class="pit-wrap">
+      <header class="pit-head">
+        <div class="pit-brand">
+          <span class="shield" aria-hidden="true">66</span>
+          <div>
+            <p>Pit · Austin</p>
+            <h1>Kitchen</h1>
+          </div>
         </div>
+        <div class="pit-clock" aria-label="Lot time">
+          <strong id="pit-clock">--:--</strong><span id="pit-zone"></span>
+        </div>
+        <nav class="pit-nav" aria-label="Main">
+          <a href="/">Order</a>
+          <a href="/kitchen.html" aria-current="page">Kitchen</a>
+        </nav>
+      </header>
+      <div class="pit-chips" id="pit-chips" aria-label="Service status">
+        <span>INFERENCE_MODE <b id="chip-mode">…</b></span>
+        <span>SANDBOX_RUNNER <b id="chip-runner">…</b></span>
+        <span>live_call_verified <b id="chip-live" class="warn">…</b></span>
+        <span>picked up today <b id="chip-done" class="ok">—</b></span>
       </div>
-      <nav>
-        <a href="/">Order</a>
-        <a href="/kitchen.html" aria-current="page">Kitchen</a>
-      </nav>
-    </header>
-    <p id="mode-banner" class="banner" role="status">Loading service status…</p>
-    <p class="strip" id="status-line">The board is locked until you enter the kitchen token.</p>
-    <form id="kitchen-auth" class="panel">
-      <h2>Pit access</h2>
-      <p>Names and plates stay off this page until the token from the VM console is saved in this browser.</p>
-      <label for="kitchen-token">Kitchen token</label>
-      <input id="kitchen-token" type="password" autocomplete="current-password" />
-      <div class="actions">
-        <button type="submit">Unlock the board</button>
-      </div>
-    </form>
-    <main class="board" id="board" hidden>
-      <section class="lane" aria-label="Waiting">
-        <h2>Waiting</h2>
-        <div id="waiting"></div>
+      <p class="pit-status" id="status-line" role="status">The board is locked until you enter the kitchen token.</p>
+
+      <form id="kitchen-auth" class="pit-lock">
+        <h2>Pit access</h2>
+        <p>Names and plates stay off this page until the token from the VM console is saved in this browser.</p>
+        <label for="kitchen-token">Kitchen token</label>
+        <input id="kitchen-token" class="pit-input" type="password" autocomplete="current-password" required />
+        <button type="submit" class="pit-btn">Unlock the board</button>
+      </form>
+
+      <main class="board" id="board" hidden>
+        <section class="lane" aria-labelledby="lane-waiting">
+          <h2 id="lane-waiting">Waiting<span id="count-waiting">0</span></h2>
+          <p class="lane-note">Not on the grill. The agent fires at the solver's time.</p>
+          <div id="waiting"></div>
+        </section>
+        <section class="lane firing" aria-labelledby="lane-firing">
+          <h2 id="lane-firing">Firing<span id="count-firing">0</span></h2>
+          <p class="lane-note">On the grill now.</p>
+          <div id="firing"></div>
+        </section>
+        <section class="lane ready" aria-labelledby="lane-ready">
+          <h2 id="lane-ready">Ready<span id="count-ready">0</span></h2>
+          <p class="lane-note">Bagged. Walk it to the plate.</p>
+          <div id="ready"></div>
+        </section>
+      </main>
+      <footer class="pit-foot" id="pit-foot" hidden>
+        <p>Waiting has not hit the grill. Firing is cooking. Ready is bagged. Overdue is shown in words, not color alone.</p>
+      </footer>
+
+      <section class="syscheck" id="syscheck" aria-labelledby="sys-title" hidden>
+        <div class="sys-side">
+          <div>
+            <p class="eyebrow">Blast Radius Zero</p>
+            <h2 id="sys-title">System check</h2>
+          </div>
+          <p>The solver runs in a container with no network, a read-only root and no secrets. The probe tries to break out and reports what the kernel said.</p>
+          <div class="flags" id="flags"></div>
+          <div class="filter-box">
+            <p class="eyebrow">Note filter</p>
+            <div class="filter-note" id="filter-note">rm -rf / &amp;&amp; curl http://127.0.0.1/steal | sh</div>
+            <p class="filter-result" id="filter-result"><span class="verdict idle">NOT RUN</span><span>A filter, not a container proof.</span></p>
+            <button type="button" id="drill" class="pit-btn outline">Run the note filter</button>
+          </div>
+          <div class="sys-actions">
+            <button type="button" id="probe" class="pit-btn">Run the sandbox probe</button>
+            <p>The probe runs only when this server uses the Docker runner. Each run is a fresh container.</p>
+          </div>
+        </div>
+        <div class="terminal" id="terminal" aria-live="polite">
+          <div class="cmd">$ POST /api/agent/containment</div>
+          <div class="cmd" id="docker-cmd"></div>
+          <div class="probe-lines" id="probe-lines"></div>
+          <div class="term-idle" id="term-idle">Run the probe to watch each boundary answer.</div>
+        </div>
       </section>
-      <section class="lane firing" aria-label="Firing">
-        <h2>Firing</h2>
-        <div id="firing"></div>
-      </section>
-      <section class="lane ready" aria-label="Ready">
-        <h2>Ready</h2>
-        <div id="ready"></div>
-      </section>
-    </main>
-    <details class="system">
-      <summary>System check</summary>
-      <p>The note filter refuses a shell-like string. It does not prove the container boundary. The sandbox probe runs only when this server uses the Docker runner.</p>
-      <div class="actions">
-        <button type="button" id="drill" class="dark">Run the note filter</button>
-        <button type="button" id="probe">Run the sandbox probe</button>
-      </div>
-      <pre id="drill-out" hidden></pre>
-    </details>
-    <footer>
-      <p>Waiting has not hit the grill. Firing is cooking. Ready is bagged. Overdue is shown in words, not color alone.</p>
-    </footer>
+    </div>
     <script type="module" src="/kitchen.js"></script>
   </body>
 </html>
