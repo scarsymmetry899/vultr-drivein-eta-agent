@@ -137,6 +137,17 @@ test("a late click fires immediately", () => {
   assert.equal(result.ready_by, at("2026-11-05T18:13:00-06:00"));
 });
 
+test("a July ETA uses central daylight time", () => {
+  const result = solveFireTime({
+    ...SAMPLE_INPUT,
+    now: "2026-07-15T17:00:00-05:00",
+    eta: "2026-07-15T18:10:00-05:00",
+  });
+  assert.equal(result.decision, "fire");
+  assert.equal(result.fire_at, at("2026-07-15T17:59:00-05:00"));
+  assert.equal(result.ready_by, at("2026-07-15T18:07:00-05:00"));
+});
+
 test("tomorrow's ETA uses tomorrow's open hours", () => {
   const result = solveFireTime({
     ...SAMPLE_INPUT,

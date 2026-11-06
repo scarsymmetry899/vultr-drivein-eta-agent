@@ -2,11 +2,22 @@ import express, { type NextFunction, type Request, type Response } from "express
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config.ts";
+import { databaseOk } from "./db.ts";
 import { loadDotEnv } from "./env.ts";
+import { inferenceConfigured } from "../agent/inference.ts";
 import { loadMenu } from "./menu.ts";
-import { runContainmentDrill, scheduleOrder } from "./schedule.ts";
-import { createOrder, kitchenBoard, listUnavailable, markHere } from "./store.ts";
-import { parseOrderBody } from "./validate.ts";
+import { runBoundaryProbe, runContainmentDrill, scheduleOrder } from "./schedule.ts";
+import {
+  createOrder,
+  findOrder,
+  getOrder,
+  kitchenBoard,
+  listUnavailable,
+  markHere,
+  markPickedUp,
+  markReady,
+} from "./store.ts";
+import { normalizePlate, parseOrderBody } from "./validate.ts";
 
 loadDotEnv();
 
@@ -17,12 +28,17 @@ export function createApp(): express.Express {
 
   app.get("/api/health", (_req, res) => {
     const config = loadConfig();
-    res.json({
-      ok: true,
+    const dbOk = databaseOk();
+    res.status(dbOk ? 200 : 503).json({
+      ok: dbOk,
       drive_in: config.driveIn,
       city: config.city,
+      persistence: "sqlite",
       runner: config.sandboxRunner,
-      inference: "stub-unless-configured",
+      isolation: config.sandboxRunner === "docker" ? "docker" : "none",
+      fail_closed: config.sandboxRunner === "docker",
+      inference_mode: config.inferenceMode,
+      inference_configured: inferenceConfigured(),
     });
   });
 
@@ -76,7 +92,12 @@ export function createApp(): express.Express {
       }
       const record = body as Record<string, unknown>;
       if (record.containment_drill === true) {
-        res.json(await runContainmentDrill(config));
+        const drill = await runContainmentDrill(config);
+        if ("error" in drill) {
+          res.status(drill.status).json({ error: drill.error, isolation: "docker", fail_closed: true });
+          return;
+        }
+        res.json(drill);
         return;
       }
       const orderId = record.order_id;
@@ -87,7 +108,11 @@ export function createApp(): express.Express {
       const utterance = typeof record.utterance === "string" ? record.utterance : undefined;
       const result = await scheduleOrder(orderId, config, utterance);
       if ("error" in result) {
-        res.status(result.status).json({ error: result.error });
+        const failClosed = result.status === 503;
+        res.status(result.status).json({
+          error: result.error,
+          ...(failClosed ? { isolation: "docker", fail_closed: true } : {}),
+        });
         return;
       }
       res.json(result);
@@ -97,6 +122,92 @@ export function createApp(): express.Express {
   app.get("/api/kitchen/board", (_req, res) => {
     res.json(kitchenBoard(loadConfig()));
   });
+
+  app.get("/api/orders/lookup", (req, res) => {
+    const orderNumber = typeof req.query.order_number === "string" ? req.query.order_number.trim().toUpperCase() : "";
+    const plate = normalizePlate(req.query.car_plate);
+    if (!/^R66-\d{5}$/.test(orderNumber) || typeof plate !== "string") {
+      res.status(400).json({ error: "Enter the ticket number and the plate on that ticket." });
+      return;
+    }
+    const order = findOrder(orderNumber, plate);
+    if (!order) {
+      res.status(404).json({ error: "No ticket matches that number and plate." });
+      return;
+    }
+    res.json({ order });
+  });
+
+  app.get("/api/orders/:id", (req, res) => {
+    const id = req.params.id;
+    if (!id) {
+      res.status(404).json({ error: "Order not found." });
+      return;
+    }
+    const order = getOrder(id);
+    if (!order) {
+      res.status(404).json({ error: "Order not found." });
+      return;
+    }
+    res.json({ order });
+  });
+
+  app.post("/api/orders/:id/ready", (req, res) => {
+    const id = req.params.id;
+    if (!id) {
+      res.status(404).json({ error: "Order not found." });
+      return;
+    }
+    const result = markReady(id);
+    if (!result.order) {
+      res.status(404).json({ error: "Order not found." });
+      return;
+    }
+    if (!result.changed) {
+      res.status(409).json({ error: "Only a firing ticket can be marked ready.", order: result.order });
+      return;
+    }
+    res.json({ order: result.order });
+  });
+
+  app.post("/api/orders/:id/picked-up", (req, res) => {
+    const id = req.params.id;
+    if (!id) {
+      res.status(404).json({ error: "Order not found." });
+      return;
+    }
+    const result = markPickedUp(id);
+    if (!result.order) {
+      res.status(404).json({ error: "Order not found." });
+      return;
+    }
+    if (!result.changed) {
+      res.status(409).json({ error: "Only a ready ticket can be picked up.", order: result.order });
+      return;
+    }
+    res.json({ order: result.order });
+  });
+
+  app.post(
+    "/api/agent/containment",
+    asyncRoute(async (_req, res) => {
+      const result = await runBoundaryProbe(loadConfig());
+      if ("error" in result) {
+        res.status(result.status).json({
+          error: result.error,
+          isolation: result.isolation,
+          fail_closed: result.isolation === "docker",
+          verified: false,
+        });
+        return;
+      }
+      res.json({
+        isolation: "docker",
+        verified: result.report.boundaries_held,
+        report: result.report,
+      });
+    }),
+  );
 
   app.post("/api/orders/:id/here", (req, res) => {
     const id = req.params.id;

@@ -30,6 +30,7 @@ FROM node:22-alpine
 WORKDIR /sandbox
 
 COPY package.json /sandbox/package.json
+COPY containment-probe.mjs /sandbox/containment-probe.mjs
 COPY fire-time-solver/types.ts fire-time-solver/solver.ts fire-time-solver/cli.ts /sandbox/fire-time-solver/
 
 USER node

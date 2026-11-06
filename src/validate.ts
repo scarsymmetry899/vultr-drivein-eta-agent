@@ -13,7 +13,7 @@ export function parseOrderBody(body: unknown, config: AppConfig, now = new Date(
   const customerName = cleanName(record.customer_name);
   if (typeof customerName !== "string") return { error: customerName.error };
 
-  const plate = cleanPlate(record.car_plate);
+  const plate = normalizePlate(record.car_plate);
   if (typeof plate !== "string") return { error: plate.error };
 
   const color = typeof record.car_color === "string" ? record.car_color.trim().toLowerCase() : "";
@@ -94,7 +94,7 @@ function cleanName(value: unknown): string | { error: string } {
   return name;
 }
 
-function cleanPlate(value: unknown): string | { error: string } {
+export function normalizePlate(value: unknown): string | { error: string } {
   if (typeof value !== "string") return { error: "A car plate is required." };
   const plate = value.toUpperCase().replace(/[\s-]+/g, "-").replace(/^-|-$/g, "");
   if (!/^[A-Z0-9]{2,8}(-[A-Z0-9]{1,6})?$/.test(plate)) {

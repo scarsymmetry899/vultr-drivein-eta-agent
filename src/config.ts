@@ -14,9 +14,12 @@ export interface AppConfig {
   sandboxRunner: "inprocess" | "docker";
   sandboxImage: string;
   solverTimeoutMs: number;
+  solverMaxOutputBytes: number;
   sandboxMemory: string;
   sandboxCpus: string;
   sandboxPids: number;
+  inferenceMode: "demo" | "live";
+  databasePath: string;
 }
 
 export function loadConfig(): AppConfig {
@@ -26,7 +29,7 @@ export function loadConfig(): AppConfig {
     port: intInRange(process.env.PORT, 8080, 1, 65535, "PORT"),
     driveIn: process.env.DRIVEIN_NAME?.trim() || "Route 66 Drive-In",
     city: process.env.DRIVEIN_CITY?.trim() || "Austin, TX",
-    timezone: process.env.DRIVEIN_TIMEZONE?.trim() || "America/Chicago",
+    timezone: timeZone(process.env.DRIVEIN_TIMEZONE),
     open: clock(process.env.DRIVEIN_OPEN, "11:00", "DRIVEIN_OPEN"),
     close: clock(process.env.DRIVEIN_CLOSE, "22:00", "DRIVEIN_CLOSE"),
     lat: floatInRange(process.env.DRIVEIN_LAT, 30.25, -90, 90, "DRIVEIN_LAT"),
@@ -37,9 +40,12 @@ export function loadConfig(): AppConfig {
     sandboxRunner,
     sandboxImage: imageName(process.env.SANDBOX_IMAGE),
     solverTimeoutMs: intInRange(process.env.SOLVER_TIMEOUT_MS, 5000, 200, 30_000, "SOLVER_TIMEOUT_MS"),
+    solverMaxOutputBytes: intInRange(process.env.SOLVER_MAX_OUTPUT_BYTES, 16_384, 1024, 65_536, "SOLVER_MAX_OUTPUT_BYTES"),
     sandboxMemory: memory(process.env.SANDBOX_MEMORY),
     sandboxCpus: cpus(process.env.SANDBOX_CPUS),
     sandboxPids: intInRange(process.env.SANDBOX_PIDS, 32, 8, 256, "SANDBOX_PIDS"),
+    inferenceMode: inferenceMode(process.env.INFERENCE_MODE),
+    databasePath: process.env.DATABASE_PATH?.trim() || "data/drivein.sqlite",
   };
 }
 
@@ -59,6 +65,22 @@ function floatInRange(raw: string | undefined, fallback: number, min: number, ma
     throw new Error(`${name} must be a number from ${min} to ${max}.`);
   }
   return value;
+}
+
+function timeZone(raw: string | undefined): string {
+  const value = raw?.trim() || "America/Chicago";
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value }).format(new Date());
+  } catch {
+    throw new Error(`DRIVEIN_TIMEZONE is not a known zone (${value}).`);
+  }
+  return value;
+}
+
+function inferenceMode(raw: string | undefined): "demo" | "live" {
+  const value = (raw ?? "demo").trim().toLowerCase();
+  if (value === "demo" || value === "live") return value;
+  throw new Error("INFERENCE_MODE must be demo or live.");
 }
 
 function clock(raw: string | undefined, fallback: string, name: string): string {

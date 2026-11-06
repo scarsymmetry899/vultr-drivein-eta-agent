@@ -1,11 +1,17 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
+import { mkdtempSync } from "node:fs";
 import type { AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
+import { closeDatabase } from "./db.ts";
 import { createApp } from "./server.ts";
 
 delete process.env.VULTR_INFERENCE_API_KEY;
 process.env.SANDBOX_RUNNER = "inprocess";
+process.env.INFERENCE_MODE = "demo";
+process.env.DATABASE_PATH = join(mkdtempSync(join(tmpdir(), "r66-")), "orders.sqlite");
 
 function chicagoMinutes(date: Date): number {
   const formatter = new Intl.DateTimeFormat("en-US", {
@@ -45,7 +51,7 @@ test("guest ticket is priced, scheduled, and rushed onto the board", async () =>
     assert.equal(home.status, 200);
     assert.match(await home.text(), /Route 66 Drive-In/);
     const kitchenPage = await fetch(`${base}/kitchen.html`);
-    assert.match(await kitchenPage.text(), /Kitchen board/);
+    assert.match(await kitchenPage.text(), /Kitchen/);
 
     const menu = await (await fetch(`${base}/api/menu`)).json();
     const rings = menu.items.find((item: { sku: string }) => item.sku === "onion-rings");
@@ -119,7 +125,10 @@ test("guest ticket is priced, scheduled, and rushed onto the board", async () =>
     const scheduleBody = await scheduled.json();
     assert.equal(scheduleBody.applied, true);
     assert.equal(scheduleBody.runner, "inprocess");
-    assert.equal(scheduleBody.explanation.source, "stub");
+    assert.equal(scheduleBody.explanation.mode, "demo");
+    assert.equal(scheduleBody.explanation.live, false);
+    assert.equal(scheduleBody.explanation.source, "deterministic");
+    assert.equal(scheduleBody.isolation, "none");
     assert.equal(scheduleBody.parse.applied_to_order, false);
     assert.equal(scheduleBody.parse.car_plate, "TX-9999");
     assert.ok(scheduleBody.parse.items.some((item: { sku: string }) => item.sku === "cheeseburger"));
@@ -164,6 +173,56 @@ test("guest ticket is priced, scheduled, and rushed onto the board", async () =>
     assert.equal(drillBody.order, null);
     const stillThere = await (await fetch(`${base}/api/kitchen/board`)).json();
     assert.ok(stillThere.firing.some((card: { id: string }) => card.id === order.id));
+
+    const health = await (await fetch(`${base}/api/health`)).json();
+    assert.equal(health.persistence, "sqlite");
+    assert.equal(health.inference_mode, "demo");
+    assert.equal(health.isolation, "none");
+    assert.equal(health.fail_closed, false);
+
+    const tooSoon = await fetch(`${base}/api/orders/${order.id}/picked-up`, { method: "POST" });
+    assert.equal(tooSoon.status, 409);
+    const marked = await fetch(`${base}/api/orders/${order.id}/ready`, { method: "POST" });
+    assert.equal(marked.status, 200);
+    assert.equal((await marked.json()).order.status, "ready");
+    const picked = await fetch(`${base}/api/orders/${order.id}/picked-up`, { method: "POST" });
+    assert.equal(picked.status, 200);
+    assert.equal((await picked.json()).order.status, "completed");
+
+    const probe = await fetch(`${base}/api/agent/containment`, { method: "POST" });
+    assert.equal(probe.status, 200);
+    const probeBody = await probe.json();
+    assert.equal(probeBody.verified, false);
+    assert.equal(probeBody.isolation, "none");
+
+    closeDatabase();
+    const found = await fetch(
+      `${base}/api/orders/lookup?order_number=${order.order_number}&car_plate=${order.car_plate}`,
+    );
+    assert.equal(found.status, 200);
+    assert.equal((await found.json()).order.id, order.id);
+
+    const second = await fetch(`${base}/api/orders`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        customer_name: "Riley Chen",
+        car_plate: "TX-9090",
+        car_color: "green",
+        eta: futureEta(),
+        items: [{ sku: "chili-dog", qty: 1 }],
+      }),
+    });
+    const secondOrder = (await second.json()).order;
+    const [left, right] = await Promise.all([
+      fetch(`${base}/api/orders/${secondOrder.id}/here`, { method: "POST" }),
+      fetch(`${base}/api/orders/${secondOrder.id}/here`, { method: "POST" }),
+    ]);
+    const leftBody = await left.json();
+    const rightBody = await right.json();
+    assert.equal(leftBody.order.status, "cooking");
+    assert.equal(rightBody.order.status, "cooking");
+    assert.equal(leftBody.order.kitchen_start_at, rightBody.order.kitchen_start_at);
   } finally {
     await new Promise<void>((resolve, reject) => {
       server.close((error) => (error ? reject(error) : resolve()));

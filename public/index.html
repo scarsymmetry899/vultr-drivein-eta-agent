@@ -4,15 +4,16 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Route 66 Drive-In — Order on the go</title>
-    <meta name="description" content="Fictional Austin drive-in. Preorder with an ETA and a car plate. The pit fires the grill so the bag is ready when you arrive." />
+    <meta name="description" content="Fictional Austin drive-in. Preorder with an arrival time and a car plate. Pay at the window. No account required." />
     <link rel="stylesheet" href="/styles.css" />
   </head>
-  <body>
+  <body class="guest">
+    <a class="skip" href="#menu">Skip to menu</a>
     <header class="top">
       <div class="brand">
         <span class="shield" aria-hidden="true">66</span>
         <div>
-          <p class="eyebrow">Austin, Texas · fictional lot</p>
+          <p class="eyebrow">Austin · fictional lot</p>
           <h1>Route 66 Drive-In</h1>
         </div>
       </div>
@@ -21,19 +22,29 @@
         <a href="/kitchen.html">Kitchen</a>
       </nav>
     </header>
-    <p class="strip">Order on the way. We fire the grill so the bag is at the window when you roll up.</p>
+    <p id="mode-banner" class="banner" role="status">Loading service status…</p>
     <main class="layout">
-      <section>
-        <h2>Menu</h2>
-        <p id="hours" class="meta">Loading the window…</p>
-        <div id="menu" class="menu" aria-live="polite"></div>
+      <section class="menu" id="menu" aria-busy="true">
+        <h2>Tonight's menu</h2>
+        <p id="hours" class="meta">Loading the window and prices…</p>
+        <div id="menu-list" class="menu-list"></div>
       </section>
-      <section class="ticket">
-        <h2>Your ticket</h2>
+      <section class="ticket" id="ticket">
+        <h2>Your order</h2>
+        <p class="hint">No account. No card charge in this demo. You pay at the window when you arrive.</p>
+        <form id="lookup" class="lookup">
+          <h3>Already sent a ticket?</h3>
+          <label for="lookup_number">Ticket number</label>
+          <input id="lookup_number" name="order_number" autocomplete="off" placeholder="R66-12345" />
+          <label for="lookup_plate">Plate on that ticket</label>
+          <input id="lookup_plate" name="car_plate" autocomplete="off" placeholder="TX-4821" autocapitalize="characters" />
+          <div class="actions">
+            <button type="submit" class="dark">Find my ticket</button>
+          </div>
+        </form>
         <form id="order-form">
           <label for="customer_name">Name on the bag</label>
           <input id="customer_name" name="customer_name" autocomplete="name" required maxlength="60" placeholder="Alex Rivera" />
-
           <div class="row">
             <div>
               <label for="car_plate">Car plate</label>
@@ -54,25 +65,26 @@
               </select>
             </div>
           </div>
-
-          <label for="car_model">Car (optional)</label>
-          <input id="car_model" name="car_model" maxlength="40" placeholder="Mustang" />
-
+          <label for="car_model">Car, if you want it on the card</label>
+          <input id="car_model" name="car_model" maxlength="40" placeholder="Optional" />
           <label for="eta">When you'll pull in</label>
           <input id="eta" name="eta" type="datetime-local" required />
-
           <label for="notes">Note for the pit</label>
           <textarea id="notes" name="notes" maxlength="200" rows="2" placeholder="No onion, please."></textarea>
-
+          <p id="estimate" class="hint">Nothing in the bag yet.</p>
           <div class="actions">
-            <button type="submit">Place order</button>
+            <button type="submit" id="send">Send to the pit</button>
           </div>
         </form>
         <div id="result" class="result" hidden aria-live="polite"></div>
       </section>
     </main>
+    <div class="dock">
+      <p id="dock-summary">Nothing in the bag yet</p>
+      <a href="#ticket">Review order</a>
+    </div>
     <footer>
-      <p>Fictional demo kitchen for the Vultr Agent Rush. Prices are USD. No payment is taken and the lot does not track your phone's GPS. Onion rings are 86 today.</p>
+      <p>Fictional Route 66 Drive-In in Austin. Prices are USD. Onion rings are 86 today. This lot does not track your phone.</p>
     </footer>
     <script type="module" src="/guest.js"></script>
   </body>

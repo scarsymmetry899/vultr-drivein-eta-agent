@@ -5,3 +5,7 @@ dist/
 *.log
 .DS_Store
 .playwright-mcp/
+data/*.sqlite
+data/*.sqlite-*
+data/*.sqlite-journal
+evidence/

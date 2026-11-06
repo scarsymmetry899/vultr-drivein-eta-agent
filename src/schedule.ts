@@ -1,7 +1,8 @@
 import { explainDecision, parseUtterance } from "../agent/inference.ts";
 import type { Explanation, ParseResult } from "../agent/inference.ts";
 import { loadMenu } from "./menu.ts";
-import { runSolver } from "./sandbox-runner.ts";
+import { runContainmentProbe, runSolver, SandboxUnavailableError } from "./sandbox-runner.ts";
+import type { Isolation, ProbeReport } from "./sandbox-runner.ts";
 import type { AppConfig } from "./config.ts";
 import {
   activeFireWindows,
@@ -15,7 +16,8 @@ import type { DriveInOrder } from "./types.ts";
 
 export interface ScheduleResponse {
   applied: boolean;
-  runner: "inprocess" | "docker" | "inprocess-fallback";
+  runner: "inprocess" | "docker";
+  isolation: Isolation;
   runner_warning: string | null;
   decision: SolveResult;
   explanation: Explanation;
@@ -59,6 +61,7 @@ export async function scheduleOrder(
     return {
       applied: false,
       runner: config.sandboxRunner,
+      isolation: "none",
       runner_warning: "Ticket is already firing, so the solver was not run again.",
       decision,
       explanation,
@@ -68,7 +71,9 @@ export async function scheduleOrder(
   }
 
   const now = new Date();
-  const outcome = await runSolver(
+  let outcome;
+  try {
+    outcome = await runSolver(
     {
       eta: existing.eta_timestamp,
       now: now.toISOString(),
@@ -88,7 +93,13 @@ export async function scheduleOrder(
       raw_note: existing.special_notes,
     },
     config,
-  );
+    );
+  } catch (error) {
+    if (error instanceof SandboxUnavailableError) {
+      return { error: error.message, status: 503 };
+    }
+    throw error;
+  }
 
   const explanation = await explainDecision({
     orderNumber: existing.order_number,
@@ -102,6 +113,7 @@ export async function scheduleOrder(
     return {
       applied: false,
       runner: outcome.runner,
+      isolation: outcome.isolation,
       runner_warning: outcome.warning,
       decision: outcome.result,
       explanation,
@@ -112,7 +124,7 @@ export async function scheduleOrder(
 
   const fireAt = new Date(outcome.result.fire_at);
   const status = fireAt.getTime() <= now.getTime() ? "cooking" : "confirmed";
-  const order = applySchedule(existing.id, {
+  const saved = applySchedule(existing.id, {
     kitchen_start_at: outcome.result.fire_at,
     ready_by: outcome.result.ready_by,
     prep_minutes: outcome.result.prep_minutes,
@@ -122,13 +134,16 @@ export async function scheduleOrder(
   });
 
   return {
-    applied: true,
+    applied: saved.changed,
     runner: outcome.runner,
-    runner_warning: outcome.warning,
+    isolation: outcome.isolation,
+    runner_warning: saved.changed
+      ? outcome.warning
+      : "The ticket changed before the schedule could be saved.",
     decision: outcome.result,
     explanation,
     parse,
-    order: order ?? null,
+    order: saved.order ?? null,
   };
 }
 
@@ -137,22 +152,50 @@ export async function scheduleOrder(
  * The fixture string is classified by the solver and is not passed to a shell.
  * No order is created or changed.
  */
-export async function runContainmentDrill(config: AppConfig): Promise<ScheduleResponse> {
-  const outcome = await runSolver(HOSTILE_DEMO_INPUT, config);
+export async function runContainmentDrill(
+  config: AppConfig,
+): Promise<ScheduleResponse | { error: string; status: number }> {
+  let outcome;
+  try {
+    outcome = await runSolver(HOSTILE_DEMO_INPUT, config);
+  } catch (error) {
+    if (error instanceof SandboxUnavailableError) return { error: error.message, status: 503 };
+    throw error;
+  }
+  const kept = outcome;
   const explanation = await explainDecision({
     orderNumber: "DRILL",
     carPlate: "—",
-    decision: outcome.result,
+    decision: kept.result,
   });
   return {
     applied: false,
-    runner: outcome.runner,
-    runner_warning: outcome.warning,
-    decision: outcome.result,
+    runner: kept.runner,
+    isolation: kept.isolation,
+    runner_warning: kept.warning,
+    decision: kept.result,
     explanation,
     parse: null,
     order: null,
   };
+}
+
+export async function runBoundaryProbe(
+  config: AppConfig,
+): Promise<{ report: ProbeReport; isolation: "docker" } | { error: string; status: number; isolation: Isolation }> {
+  try {
+    const report = await runContainmentProbe(config);
+    return { report, isolation: "docker" };
+  } catch (error) {
+    if (error instanceof SandboxUnavailableError) {
+      return {
+        error: error.message,
+        status: config.sandboxRunner === "docker" ? 503 : 200,
+        isolation: config.sandboxRunner === "docker" ? "docker" : "none",
+      };
+    }
+    throw error;
+  }
 }
 
 async function maybeParse(utterance: string | undefined): Promise<ScheduleResponse["parse"]> {

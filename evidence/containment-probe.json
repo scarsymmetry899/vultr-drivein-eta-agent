@@ -1,0 +1,1 @@
+{"probe":"route66-containment","uid":1000,"root":false,"secret_present":false,"write_sandbox":"EROFS","write_etc":"EROFS","read_shadow":"EACCES","network":"ENETUNREACH","host_canary":"ENOENT","tmp_write":true,"boundaries_held":true}
