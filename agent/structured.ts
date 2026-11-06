@@ -96,16 +96,30 @@ export const PARSE_SCHEMA = {
 } as const;
 
 function parseObject(raw: string): { ok: true; value: Record<string, unknown> } | { ok: false; reason: string } {
+  const cleaned = stripFence(stripReasoning(raw));
   let value: unknown;
   try {
-    value = JSON.parse(stripFence(raw));
+    value = JSON.parse(cleaned);
   } catch {
-    return { ok: false, reason: "Inference did not return JSON." };
+    // Some models add a sentence around the JSON. Take the outermost object and let the schema checks decide.
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    if (start === -1 || end <= start) return { ok: false, reason: "Inference did not return JSON." };
+    try {
+      value = JSON.parse(cleaned.slice(start, end + 1));
+    } catch {
+      return { ok: false, reason: "Inference did not return JSON." };
+    }
   }
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return { ok: false, reason: "Inference JSON must be an object." };
   }
   return { ok: true, value: value as Record<string, unknown> };
+}
+
+/** Reasoning models may prefix their answer with a think block. It is not part of the answer. */
+function stripReasoning(text: string): string {
+  return text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
 }
 
 function stripFence(text: string): string {

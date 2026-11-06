@@ -234,7 +234,7 @@ async function chat(
       body: JSON.stringify({
         model,
         temperature: 0,
-        max_tokens: 220,
+        max_tokens: 1024,
         ...(structured
           ? { response_format: { type: "json_schema", json_schema: { name: schemaName, strict: true, schema } } }
           : {}),
