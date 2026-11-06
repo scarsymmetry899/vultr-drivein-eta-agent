@@ -143,7 +143,7 @@ function renderCard(card, now) {
       ["Ready by", short(card.ready_by), "green"],
     ]);
     if (card.fire_moved_from) {
-      const moved = node("span", "moved", "Rush fire at check-in · planned ");
+      const moved = node("span", "moved", card.guest_here ? "Rush fire at check-in · planned " : "Early fire · planned ");
       moved.append(node("strong", "", short(card.fire_moved_from)));
       times.append(moved);
     }
