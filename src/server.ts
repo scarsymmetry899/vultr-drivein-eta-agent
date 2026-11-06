@@ -17,6 +17,7 @@ import {
   markPickedUp,
   markReady,
 } from "./store.ts";
+import { kitchenConfigured, kitchenTokenFrom, requireKitchen, authorizeKitchen } from "./kitchen-auth.ts";
 import { normalizePlate, parseOrderBody } from "./validate.ts";
 
 loadDotEnv();
@@ -25,6 +26,8 @@ export function createApp(): express.Express {
   const app = express();
   app.disable("x-powered-by");
   app.use(express.json({ limit: "32kb" }));
+  app.use("/api/orders", rateLimit);
+  app.use("/api/agent/schedule", rateLimit);
 
   app.get("/api/health", (_req, res) => {
     const config = loadConfig();
@@ -39,6 +42,7 @@ export function createApp(): express.Express {
       fail_closed: config.sandboxRunner === "docker",
       inference_mode: config.inferenceMode,
       inference_configured: inferenceConfigured(),
+      kitchen_auth: kitchenConfigured(),
     });
   });
 
@@ -92,6 +96,13 @@ export function createApp(): express.Express {
       }
       const record = body as Record<string, unknown>;
       if (record.containment_drill === true) {
+        const decision = authorizeKitchen(kitchenTokenFrom(req));
+        if (decision !== "ok") {
+          res.status(decision === "unconfigured" ? 503 : 401).json({
+            error: decision === "unconfigured" ? "Kitchen access is not configured." : "Kitchen token required.",
+          });
+          return;
+        }
         const drill = await runContainmentDrill(config);
         if ("error" in drill) {
           res.status(drill.status).json({ error: drill.error, isolation: "docker", fail_closed: true });
@@ -119,7 +130,7 @@ export function createApp(): express.Express {
     }),
   );
 
-  app.get("/api/kitchen/board", (_req, res) => {
+  app.get("/api/kitchen/board", requireKitchen, (_req, res) => {
     res.json(kitchenBoard(loadConfig()));
   });
 
@@ -152,7 +163,7 @@ export function createApp(): express.Express {
     res.json({ order });
   });
 
-  app.post("/api/orders/:id/ready", (req, res) => {
+  app.post("/api/orders/:id/ready", requireKitchen, (req, res) => {
     const id = req.params.id;
     if (!id) {
       res.status(404).json({ error: "Order not found." });
@@ -170,7 +181,7 @@ export function createApp(): express.Express {
     res.json({ order: result.order });
   });
 
-  app.post("/api/orders/:id/picked-up", (req, res) => {
+  app.post("/api/orders/:id/picked-up", requireKitchen, (req, res) => {
     const id = req.params.id;
     if (!id) {
       res.status(404).json({ error: "Order not found." });
@@ -190,6 +201,7 @@ export function createApp(): express.Express {
 
   app.post(
     "/api/agent/containment",
+    requireKitchen,
     asyncRoute(async (_req, res) => {
       const result = await runBoundaryProbe(loadConfig());
       if ("error" in result) {
@@ -249,6 +261,26 @@ export function createApp(): express.Express {
   });
 
   return app;
+}
+
+const hits = new Map<string, number[]>();
+
+function rateLimit(req: Request, res: Response, next: NextFunction): void {
+  const ip = req.ip || req.socket.remoteAddress || "unknown";
+  const now = Date.now();
+  const recent = (hits.get(ip) ?? []).filter((stamp) => now - stamp < 60_000);
+  if (recent.length >= 30) {
+    res.status(429).json({ error: "Too many requests. Wait a minute." });
+    return;
+  }
+  recent.push(now);
+  hits.set(ip, recent);
+  if (hits.size > 5000) {
+    for (const [key, stamps] of hits) {
+      if (stamps.every((stamp) => now - stamp >= 60_000)) hits.delete(key);
+    }
+  }
+  next();
 }
 
 function asyncRoute(handler: (req: Request, res: Response) => Promise<void>) {

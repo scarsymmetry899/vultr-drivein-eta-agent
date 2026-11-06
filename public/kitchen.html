@@ -22,8 +22,17 @@
       </nav>
     </header>
     <p id="mode-banner" class="banner" role="status">Loading service status…</p>
-    <p class="strip" id="status-line">Waiting for tickets…</p>
-    <main class="board" id="board">
+    <p class="strip" id="status-line">The board is locked until you enter the kitchen token.</p>
+    <form id="kitchen-auth" class="panel">
+      <h2>Pit access</h2>
+      <p>Names and plates stay off this page until the token from the VM console is saved in this browser.</p>
+      <label for="kitchen-token">Kitchen token</label>
+      <input id="kitchen-token" type="password" autocomplete="current-password" />
+      <div class="actions">
+        <button type="submit">Unlock the board</button>
+      </div>
+    </form>
+    <main class="board" id="board" hidden>
       <section class="lane" aria-label="Waiting">
         <h2>Waiting</h2>
         <div id="waiting"></div>

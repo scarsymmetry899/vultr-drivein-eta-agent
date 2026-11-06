@@ -1,6 +1,10 @@
 # Vultr VM runbook
 
-This file is the deployment recipe. Nothing in this repository provisions a Vultr account, spends credits, or publishes a demo URL.
+The VM `route66-drivein-demo` (`65.20.93.98`) already exists. Do not create another one from this repo.
+
+For that machine, use the browser console and [`browser-console.sh`](browser-console.sh). The checklist is [`READINESS.md`](READINESS.md). Nothing here has been run on that VM yet.
+
+The steps below are the same install, spelled out. The script is the one to paste.
 
 ## What you bring
 
@@ -55,4 +59,6 @@ The script builds the solver image, runs the boundary probe, and kills a spin lo
 - `SANDBOX_RUNNER=docker` does not fall back to an in-process solve. A dead daemon leaves the ticket unscheduled.
 - Solver flags: `--network=none`, `--read-only`, `--cap-drop=ALL`, `--user node`, memory, pid, and CPU caps, a 16 MB noexec `/tmp`, and a stdout cap.
 - Guest pages do not collect a card number. Copy says pay at the window.
+- The kitchen board, mark-ready, picked-up, note filter, and sandbox probe require `KITCHEN_TOKEN`. Without that token those routes answer 401, or 503 if the token was never set. The guest menu does not list plates.
+- Do not use `deploy/docker-compose.yml` for the public demo. It mounts the Docker socket into the app container. The console script runs the app on the host and only lets it start the solver.
 - Orders are fictional demo rows in SQLite. Do not load real customer data.

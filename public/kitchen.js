@@ -1,3 +1,6 @@
+const authForm = document.querySelector("#kitchen-auth");
+const board = document.querySelector("#board");
+const tokenInput = document.querySelector("#kitchen-token");
 const lanes = {
   waiting: document.querySelector("#waiting"),
   firing: document.querySelector("#firing"),
@@ -8,6 +11,18 @@ const banner = document.querySelector("#mode-banner");
 const drillButton = document.querySelector("#drill");
 const probeButton = document.querySelector("#probe");
 const drillOut = document.querySelector("#drill-out");
+
+function kitchenFetch(url, options = {}) {
+  const headers = new Headers(options.headers || {});
+  const token = sessionStorage.getItem("route66-kitchen-token") || "";
+  if (token) headers.set("x-kitchen-token", token);
+  return fetch(url, { ...options, headers });
+}
+
+function showBoard(open) {
+  board.hidden = !open;
+  authForm.hidden = open;
+}
 
 function clock(iso, timeZone) {
   if (!iso) return "not set";
@@ -99,7 +114,7 @@ async function postStatus(id, action, button) {
   button.disabled = true;
   button.textContent = "Saving…";
   try {
-    const response = await fetch(`/api/orders/${id}/${action}`, { method: "POST" });
+    const response = await kitchenFetch(`/api/orders/${id}/${action}`, { method: "POST" });
     if (!response.ok) {
       const body = await response.json();
       statusLine.textContent = body.error || "That status change was refused.";
@@ -113,9 +128,22 @@ async function postStatus(id, action, button) {
 }
 
 async function refresh() {
+  if (!sessionStorage.getItem("route66-kitchen-token")) {
+    showBoard(false);
+    statusLine.textContent = "The board is locked until you enter the kitchen token.";
+    return;
+  }
   try {
-    const response = await fetch("/api/kitchen/board");
+    const response = await kitchenFetch("/api/kitchen/board");
+    if (response.status === 401 || response.status === 503) {
+      showBoard(false);
+      statusLine.textContent = response.status === 503
+        ? "Kitchen access is not configured on this server."
+        : "That token was refused.";
+      return;
+    }
     if (!response.ok) throw new Error("The board did not load.");
+    showBoard(true);
     const board = await response.json();
     const now = new Date(board.as_of);
     renderLane(lanes.waiting, board.waiting, board.timezone, now);
@@ -141,7 +169,7 @@ function showOut(lines) {
 drillButton.addEventListener("click", async () => {
   drillButton.disabled = true;
   try {
-    const response = await fetch("/api/agent/schedule", {
+    const response = await kitchenFetch("/api/agent/schedule", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ containment_drill: true }),
@@ -167,7 +195,7 @@ drillButton.addEventListener("click", async () => {
 probeButton.addEventListener("click", async () => {
   probeButton.disabled = true;
   try {
-    const response = await fetch("/api/agent/containment", { method: "POST" });
+    const response = await kitchenFetch("/api/agent/containment", { method: "POST" });
     const body = await response.json();
     if (!response.ok || body.verified !== true) {
       showOut([
@@ -210,6 +238,12 @@ try {
 } catch {
   banner.textContent = "Service status did not load.";
 }
+
+authForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  sessionStorage.setItem("route66-kitchen-token", tokenInput.value.trim());
+  refresh();
+});
 
 await refresh();
 setInterval(refresh, 3000);
