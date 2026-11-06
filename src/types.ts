@@ -36,6 +36,7 @@ export interface DriveInOrder {
   guest_here: boolean;
   arrived_at: string | null;
   schedule_reason: string | null;
+  decision_trail: import("./decision-trail.ts").DecisionTrail | null;
   created_at: string;
   updated_at: string;
 }

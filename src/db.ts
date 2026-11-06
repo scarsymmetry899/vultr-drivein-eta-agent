@@ -24,6 +24,7 @@ export function openDatabase(): DatabaseSync {
   if (path !== ":memory:") next.exec("PRAGMA journal_mode = WAL;");
   const schemaPath = join(dirname(fileURLToPath(import.meta.url)), "../db/sqlite.sql");
   next.exec(readFileSync(schemaPath, "utf8"));
+  ensureDecisionTrail(next);
   seedUnavailable(next);
   database = next;
   databasePath = path;
@@ -39,6 +40,12 @@ export function closeDatabase(): void {
 export function databaseOk(): boolean {
   const row = openDatabase().prepare("SELECT 1 AS ok").get() as { ok: number } | undefined;
   return row?.ok === 1;
+}
+
+function ensureDecisionTrail(db: DatabaseSync): void {
+  const columns = db.prepare("PRAGMA table_info(drivein_orders)").all() as { name: string }[];
+  if (columns.some((column) => column.name === "decision_trail")) return;
+  db.exec("ALTER TABLE drivein_orders ADD COLUMN decision_trail TEXT");
 }
 
 function seedUnavailable(db: DatabaseSync): void {

@@ -2,7 +2,7 @@
 
 A fictional Austin drive-in where a guest preorders with an ETA and a car plate. An agent on a Vultr VM asks the sandbox when to fire the grill. The kitchen board shows the ticket as waiting, firing, or ready.
 
-This repository is a working demo for [Vultr Agent Rush](https://lablab.ai/ai-hackathons/vultr-hackathon), Challenge 1 — **Blast Radius Zero**. It is not deployed. No Vultr resources are provisioned from this repo. Local runs use deterministic demo inference unless you set `INFERENCE_MODE=live` on a machine that has a key.
+This repository is a working demo for [Vultr Agent Rush](https://lablab.ai/ai-hackathons/vultr-hackathon), Challenge 1 — **Blast Radius Zero**. An operator already created the VM `route66-drivein-demo` (`65.20.93.98`) and confirmed health plus a fictional checkout at commit `2d8e2dc`. Later commits, including the Austin-hours check and this decision trail, are on `main` and are not confirmed live until that operator runs [`deploy/UPDATE.md`](deploy/UPDATE.md). This repo does not provision Vultr resources. Local runs use deterministic demo inference. `INFERENCE_MODE=live` is not configured on the VM, and no live call has been verified from this repository.
 
 Nothing here is a real restaurant, a real order, or a payment. Do not commit customer data, phone numbers, or API keys.
 
@@ -10,7 +10,7 @@ Nothing here is a real restaurant, a real order, or a payment. Do not commit cus
 
 1. The guest builds a ticket on the order page: name, plate, color, items, and the time they will pull in.
 2. `POST /api/orders` prices the ticket in USD cents and sales tax, and stores it as `confirmed`. Onion rings are 86 (sold out) in the demo.
-3. `POST /api/agent/schedule` runs the fire-time solver. The solver returns `fire_at` (stored as `kitchen_start_at`) and `ready_by`. In demo mode the sentence under the ticket is deterministic. In live mode Vultr Serverless Inference may supply a JSON `summary`, which is rejected if it fails the schema. The model cannot set the clock.
+3. `POST /api/agent/schedule` runs the fire-time solver. The solver returns `fire_at` (stored as `kitchen_start_at`) and `ready_by`. The ticket stores that trail: arrival, prep, fire, ready, and what changed. The sentence under it is labeled separately. Demo wording is deterministic and makes no network call. Live wording, only if `INFERENCE_MODE=live`, must be a short JSON summary from `https://api.vultrinference.com/v1`. A bad or failed reply is labeled and the solver sentence stays. The model cannot set the clock. An early “I’m at the stall” replaces a future fire time and the trail says so.
 4. The kitchen board lists **waiting** (`confirmed`), **firing** (`cooking`), and **ready**. Staff can mark a firing ticket ready and a ready ticket picked up (`completed`).
 5. `POST /api/orders/:id/here` means the car is at the stall. If the grill has not started, the ticket rush-fires now. A second tap does not move the fire clock. A ticket that is already firing stays on its current clock if schedule is called again.
 
@@ -23,7 +23,7 @@ Challenge 1 wants Vultr as the control plane, with real work dispatched into an 
 | Piece | Role here |
 | --- | --- |
 | [Vultr Cloud Compute](https://www.vultr.com/products/cloud-compute/) VM | Runs this Express app. The VM is the control plane: it takes the order, calls inference, and dispatches the solver. **Not created by this repo.** |
-| [Vultr Serverless Inference](https://docs.vultr.com/vultr-inference-api) | OpenAI-compatible chat at `https://api.vultrinference.com/v1`. Used only when `INFERENCE_MODE=live` and both the key and model are set. Output must match a JSON schema and is display copy only. |
+| [Vultr Serverless Inference](https://docs.vultr.com/vultr-inference-api) | OpenAI-compatible chat at `https://api.vultrinference.com/v1` only. The code does not send the key to another host. Used only when `INFERENCE_MODE=live` and both the key and model are set. Output must match a JSON schema, is length-limited, and is display copy only. The deployed VM is still `INFERENCE_MODE=demo`. |
 | Docker sandbox | `sandbox/Dockerfile` runs the solver and `containment-probe.mjs`. The API's docker argv drops capabilities, uses `--network=none`, a read-only root, a non-root user, memory, pid, and CPU caps, and a stdout cap. The image has no secrets. |
 
 Pattern A from the challenge (model proposes, sandbox executes, real output comes back) is the path this app is built toward. The numbers on the board come from the solver. Pattern B (sandboxed browser) is not this product.
@@ -34,7 +34,7 @@ The default runner is in-process so `npm run dev` works before Docker is install
 
 Blast Radius Zero asks for a web agent that does real work inside a sandbox on Vultr, plus a later submission with a public demo URL and a video. The video has to show one containment moment: the sandbox absorbing something unsafe.
 
-This PR is the starting codebase for that build:
+What is in this codebase:
 
 - Guest and kitchen pages, and the four order/schedule/board/arrival routes.
 - A pure solver for `fire_at` / `ready_by` from ETA, per-item `prep_minutes`, buffer, open hours, and capacity N.
@@ -42,9 +42,9 @@ This PR is the starting codebase for that build:
 - A container probe (`sandbox/containment-probe.mjs`, `scripts/containment-demo.sh`) that tries a network connect, writes, a host file, and the inference key, then reports the kernel's errors. It runs only under Docker.
 - Inference with an explicit `demo` or `live` mode. Live text is schema-checked. Demo mode does not call the network.
 - Orders in SQLite (`db/sqlite.sql`), so a restart keeps the board.
-- Deploy recipe in [`deploy/RUNBOOK.md`](deploy/RUNBOOK.md). It is a recipe, not a claim that a VM is already up.
+- Deploy recipe in [`deploy/RUNBOOK.md`](deploy/RUNBOOK.md) and the safe update in [`deploy/UPDATE.md`](deploy/UPDATE.md).
 
-Hackathon submission still needs a Vultr VM, a public URL, and the containment video. Participants claim credits on the [hackathon page](https://lablab.ai/ai-hackathons/vultr-hackathon). This repo does not contain a gift code. Vultr GPUs are not part of the event and are not used here.
+A public URL exists only for the operator-confirmed build at `2d8e2dc`. A containment video has not been recorded. Draft narrative, recording steps, and submission text are in [`docs/HACKATHON.md`](docs/HACKATHON.md). This repo does not submit them. Participants claim credits on the [hackathon page](https://lablab.ai/ai-hackathons/vultr-hackathon). This repo does not contain a gift code. Vultr GPUs are not part of the event and are not used here.
 
 ## How this differs from ONE Drive-in
 
@@ -103,11 +103,11 @@ timeout 5s docker run --rm -i \
   route66-fire-solver
 ```
 
-Then set `SANDBOX_RUNNER=docker` in `.env` if the API should dispatch into that image. A failed container does not schedule the ticket. The boundary probe is `bash scripts/containment-demo.sh`. See [`docs/CONTAINMENT.md`](docs/CONTAINMENT.md).
+Then set `SANDBOX_RUNNER=docker` in `.env` if the API should dispatch into that image. A failed container does not schedule the ticket. The boundary probe is `bash scripts/containment-demo.sh`. It writes one JSON file under `evidence/runs/`. If Docker is down, that file has `verified: false` and the script exits 2. See [`docs/CONTAINMENT.md`](docs/CONTAINMENT.md). A checked-in probe from a laptop is not a video and is not the Vultr VM.
 
 ## Deploy on the existing Vultr VM
 
-The machine `route66-drivein-demo` at `65.20.93.98` is already running an older build. Do not run `browser-console.sh` again. After this change is on `main`, use [`deploy/UPDATE.md`](deploy/UPDATE.md). That update keeps `.env`, the kitchen token, Docker mode, and the SQLite file.
+The machine `route66-drivein-demo` at `65.20.93.98` was confirmed by the operator at commit `2d8e2dc` (health and a fictional guest checkout). Do not run `browser-console.sh` again. After a later commit is on `main`, use [`deploy/UPDATE.md`](deploy/UPDATE.md). That update keeps `.env`, the kitchen token, Docker mode, and the SQLite file. Startup adds a `decision_trail` column if the existing file does not have one. It does not wipe orders. Leave `INFERENCE_MODE=demo` until a key is set on the VM by the operator and a real call is checked by hand. Health always reports `live_call_verified: false`.
 
 The guest app is separate screens: menu by category, item, bag, checkout (arrival, vehicle, review), and a ticket timeline. The kitchen is a staff board. Demo wording stays in the footer. There is no account and no card charge.
 
@@ -121,9 +121,9 @@ See [`.env.example`](.env.example). Inference URL, key, and model are blank on p
 
 ## What was verified here
 
-`npm test` — 24 tests. They cover the solver (including a July daylight-time ETA), SQLite orders across a reopen, status transitions, demo inference that does not call the network, live output that is discarded when it fails the schema, and a Docker runner that fails closed when the daemon is missing.
+`npm test` covers the solver (including daylight time), SQLite orders and status transitions, Austin hours, kitchen auth, demo inference that does not call the network, a live call that is forced to `https://api.vultrinference.com/v1` even if another base URL is set, hostile and HTTP-failed model text that does not replace the solver sentence, the decision trail for a normal schedule and an early check-in, and a Docker runner that fails closed when the daemon is missing.
 
-On this build machine Docker Engine did start. `scripts/containment-demo.sh` is what you run on the VM. A probe in this environment returned `boundaries_held: true` (uid 1000, network `ENETUNREACH`, root writes `EROFS`, no inference key in the container). A spin loop was stopped with `docker kill` and exited 137. That is not a Vultr VM, and it is not a public demo URL.
+On a build machine that had Docker, an earlier probe returned `boundaries_held: true` (uid 1000, network `ENETUNREACH`, root writes `EROFS`, no inference key in the container). A spin loop stopped with `docker kill` exited 137. That file is not a recording, it was not produced on `65.20.93.98`, and it is not evidence that the current VM build has been re-probed. Run `bash scripts/containment-demo.sh` on the VM after the update if you want a fresh `evidence/runs/*.json` from that host.
 
 ## License
 

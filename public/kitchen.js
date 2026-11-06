@@ -84,6 +84,12 @@ function renderLane(node, cards, timeZone, now) {
     fireLine.className = "meta";
     fireLine.textContent = `Fire ${clock(card.kitchen_start_at, timeZone)} · Ready ${clock(card.ready_by, timeZone)}`;
     article.append(number, plate, who, items, etaLine, fireLine);
+    if (card.decision_changes?.[0]) {
+      const change = document.createElement("p");
+      change.className = "meta";
+      change.textContent = card.decision_changes[0];
+      article.append(change);
+    }
     if (card.special_notes) {
       const notes = document.createElement("p");
       notes.textContent = card.special_notes;

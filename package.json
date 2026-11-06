@@ -11,7 +11,7 @@
     "dev": "NODE_OPTIONS='--experimental-sqlite' tsx watch src/server.ts",
     "start": "NODE_OPTIONS='--experimental-sqlite' tsx src/server.ts",
     "sandbox:solve": "tsx sandbox/fire-time-solver/cli.ts",
-    "test": "NODE_OPTIONS='--experimental-sqlite' tsx --test sandbox/fire-time-solver/solver.test.ts agent/structured.test.ts src/kitchen-auth.test.ts src/hours.test.ts src/sandbox-runner.test.ts src/api.test.ts",
+    "test": "NODE_OPTIONS='--experimental-sqlite' tsx --test sandbox/fire-time-solver/solver.test.ts agent/structured.test.ts src/kitchen-auth.test.ts src/hours.test.ts src/sandbox-runner.test.ts src/api.test.ts src/decision-trail.test.ts scripts/assemble-evidence.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

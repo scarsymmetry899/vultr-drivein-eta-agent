@@ -1,4 +1,5 @@
 import { randomInt, randomUUID } from "node:crypto";
+import { parseTrail, trailForEarlyArrival } from "./decision-trail.ts";
 import { ticketPrepMinutes } from "../sandbox/fire-time-solver/solver.ts";
 import { openDatabase } from "./db.ts";
 import type { AppConfig } from "./config.ts";
@@ -28,6 +29,7 @@ interface OrderRow {
   guest_here: number;
   arrived_at: string | null;
   schedule_reason: string | null;
+  decision_trail: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -35,7 +37,7 @@ interface OrderRow {
 const ORDER_SELECT = `SELECT id, order_number, customer_name, car_plate, car_model, car_color, items,
   special_notes, eta_time, eta_timestamp, kitchen_start_at, ready_by, prep_minutes, buffer_minutes,
   subtotal_cents, sales_tax_cents, grand_total_cents, currency, status, order_type, guest_here,
-  arrived_at, schedule_reason, created_at, updated_at FROM drivein_orders`;
+  arrived_at, schedule_reason, decision_trail, created_at, updated_at FROM drivein_orders`;
 
 export function listUnavailable(): UnavailableItem[] {
   const rows = openDatabase()
@@ -93,6 +95,7 @@ export function createOrder(input: NewOrderInput): DriveInOrder {
       guest_here: false,
       arrived_at: null,
       schedule_reason: null,
+      decision_trail: null,
       created_at: now,
       updated_at: now,
     };
@@ -182,6 +185,7 @@ export function applySchedule(
     buffer_minutes: number;
     reason: string;
     status: OrderStatus;
+    decision_trail: string | null;
   },
 ): { order: DriveInOrder | undefined; changed: boolean } {
   const stamp = new Date().toISOString();
@@ -189,7 +193,7 @@ export function applySchedule(
     .prepare(
       `UPDATE drivein_orders
        SET kitchen_start_at = ?, ready_by = ?, prep_minutes = ?, buffer_minutes = ?,
-           schedule_reason = ?, status = ?, updated_at = ?
+           schedule_reason = ?, decision_trail = ?, status = ?, updated_at = ?
        WHERE id = ? AND status = 'confirmed'`,
     )
     .run(
@@ -198,6 +202,7 @@ export function applySchedule(
       patch.prep_minutes,
       patch.buffer_minutes,
       patch.reason,
+      patch.decision_trail,
       patch.status,
       stamp,
       id,
@@ -205,14 +210,14 @@ export function applySchedule(
   return { order: getOrder(id), changed: Number(result.changes) === 1 };
 }
 
-export function setScheduleReason(id: string, reason: string): DriveInOrder | undefined {
+export function setScheduleReason(id: string, reason: string, decisionTrail: string | null): DriveInOrder | undefined {
   const stamp = new Date().toISOString();
   openDatabase()
     .prepare(
-      `UPDATE drivein_orders SET schedule_reason = ?, updated_at = ?
+      `UPDATE drivein_orders SET schedule_reason = ?, decision_trail = ?, updated_at = ?
        WHERE id = ? AND status = 'confirmed'`,
     )
-    .run(reason, stamp, id);
+    .run(reason, decisionTrail, stamp, id);
   return getOrder(id);
 }
 
@@ -234,7 +239,7 @@ export function markHere(id: string): DriveInOrder | undefined {
       .prepare(
         `UPDATE drivein_orders
          SET guest_here = 1, arrived_at = ?, prep_minutes = ?, kitchen_start_at = ?, ready_by = ?,
-             status = 'cooking', order_type = 'now', schedule_reason = ?, updated_at = ?
+             status = 'cooking', order_type = 'now', schedule_reason = ?, decision_trail = ?, updated_at = ?
          WHERE id = ? AND status = 'confirmed'`,
       )
       .run(
@@ -243,6 +248,16 @@ export function markHere(id: string): DriveInOrder | undefined {
         stamp,
         ready,
         "Guest is at the stall. Rush fire — cooking started now.",
+        JSON.stringify(
+          trailForEarlyArrival({
+            arrival: existing.eta_time,
+            previousFire: existing.kitchen_start_at,
+            previousReady: existing.ready_by,
+            prepMinutes: prep,
+            fireAt: stamp,
+            readyBy: ready,
+          }),
+        ),
         stamp,
         id,
       );
@@ -294,6 +309,7 @@ export interface BoardCard {
   currency: "USD";
   special_notes: string;
   schedule_reason: string | null;
+  decision_changes: string[];
 }
 
 export function kitchenBoard(config: AppConfig, now = new Date()): {
@@ -352,6 +368,7 @@ function toCard(order: DriveInOrder): BoardCard {
     currency: order.currency,
     special_notes: order.special_notes,
     schedule_reason: order.schedule_reason,
+    decision_changes: order.decision_trail?.solver.changes ?? [],
   };
 }
 
@@ -381,6 +398,7 @@ function fromRow(row: OrderRow): DriveInOrder {
     guest_here: row.guest_here === 1,
     arrived_at: row.arrived_at,
     schedule_reason: row.schedule_reason,
+    decision_trail: parseTrail(row.decision_trail),
     created_at: row.created_at,
     updated_at: row.updated_at,
   };

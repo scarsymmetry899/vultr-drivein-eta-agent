@@ -12,18 +12,18 @@ The JSON shows `containment: "hostile-refused"` and `executed_payload: false`. T
 
 `bash scripts/containment-demo.sh`
 
-Show `evidence/containment-probe.json`:
+The script writes one file, `evidence/runs/<UTC stamp>.json`.
 
-- `uid` is not 0
-- `secret_present` is false (the inference key was not in the container)
-- `network` is not `connected`
-- writes under `/sandbox` and `/etc` failed
-- `/host-canary` was not readable
-- `boundaries_held` is true
+Show that file when `verified` is true:
 
-Then show `evidence/containment-spin.json` with a non-zero `spin_exit`. The `timeout` command killed the loop. The host shell kept running.
+- `checks.network` is `blocked`
+- `checks.user` is `nonroot`
+- `checks.secrets` is `absent`
+- `checks.filesystem` is `read-only`
+- `checks.timeout` is `killed` (`spin_exit` is not 0; the script uses `docker kill` after two seconds)
+- `probe.boundaries_held` is true
 
-If Docker is not installed, the script exits 2 and writes `verified: false`. Do not narrate that run as isolation.
+If Docker is not installed, the script exits 2 and the same file has `verified: false`. Do not narrate that run as isolation.
 
 ## 3. Fail closed
 
@@ -31,4 +31,4 @@ With `SANDBOX_RUNNER=docker`, stop Docker and send a schedule. The API returns 5
 
 ## What this repo has not done
 
-No Vultr VM was created from this repository. A probe JSON checked in from another machine is not a substitute for the command above on the VM you submit.
+The operator created `route66-drivein-demo` separately. A probe JSON from a laptop is not a substitute for the command above on that VM, and it is not a video.

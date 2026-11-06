@@ -26,7 +26,13 @@ curl -s -o /dev/null -w 'kitchen_without_token:%{http_code}\n' http://127.0.0.1:
 
 Stop if any `grep` fails. Do not copy a new `.env` over the old one. Do not set a Vultr inference key.
 
-Expect health to include `"persistence":"sqlite"`, `"isolation":"docker"`, `"inference_mode":"demo"`, `"kitchen_auth":true`. The kitchen line should be `kitchen_without_token:401`.
+Expect health to include `"persistence":"sqlite"`, `"isolation":"docker"`, `"inference_mode":"demo"`, `"inference_endpoint":"https://api.vultrinference.com/v1"`, `"live_call_verified":false`, `"kitchen_auth":true`. The kitchen line should be `kitchen_without_token:401`.
+
+On startup the app adds `decision_trail` to an existing SQLite file if that column is missing. It does not delete orders. Do not delete `/var/lib/route66/drivein.sqlite`.
+
+Live inference stays off. A key, if one is added later, belongs only in `/opt/route66/.env` on the VM. Health will still say `live_call_verified: false` until someone checks a real call by hand. This repository cannot do that check.
+
+After the service is healthy, record containment on the VM with `bash /opt/route66/scripts/containment-demo.sh` and keep the new `evidence/runs/*.json`. That file is the per-run evidence. A laptop run is not the VM.
 
 Guest: `http://65.20.93.98:8080/`
 Kitchen: `http://65.20.93.98:8080/kitchen.html` with the existing token in `/root/route66-kitchen-token.txt`.
