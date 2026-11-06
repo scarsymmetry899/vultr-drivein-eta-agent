@@ -1,16 +1,27 @@
-const authForm = document.querySelector("#kitchen-auth");
-const board = document.querySelector("#board");
-const tokenInput = document.querySelector("#kitchen-token");
-const lanes = {
-  waiting: document.querySelector("#waiting"),
-  firing: document.querySelector("#firing"),
-  ready: document.querySelector("#ready"),
+const $ = (selector) => document.querySelector(selector);
+const authForm = $("#kitchen-auth");
+const board = $("#board");
+const tokenInput = $("#kitchen-token");
+const statusLine = $("#status-line");
+const lanes = { waiting: $("#waiting"), firing: $("#firing"), ready: $("#ready") };
+const counts = { waiting: $("#count-waiting"), firing: $("#count-firing"), ready: $("#count-ready") };
+const drillButton = $("#drill");
+const probeButton = $("#probe");
+
+const COLORS = {
+  red: "#9c2f24",
+  white: "#f7f3ec",
+  black: "#1c1612",
+  blue: "#2c4c78",
+  silver: "#c8c2b8",
+  green: "#2d6a45",
+  yellow: "#e0b03a",
+  other: "#8d6840",
 };
-const statusLine = document.querySelector("#status-line");
-const banner = document.querySelector("#mode-banner");
-const drillButton = document.querySelector("#drill");
-const probeButton = document.querySelector("#probe");
-const drillOut = document.querySelector("#drill-out");
+
+let timeZone = "America/Chicago";
+let clockOffset = 0;
+let probeTimer = 0;
 
 function kitchenFetch(url, options = {}) {
   const headers = new Headers(options.headers || {});
@@ -19,100 +30,135 @@ function kitchenFetch(url, options = {}) {
   return fetch(url, { ...options, headers });
 }
 
+function node(tag, className, text) {
+  const element = document.createElement(tag);
+  if (className) element.className = className;
+  if (text != null && text !== "") element.textContent = text;
+  return element;
+}
+
 function showBoard(open) {
   board.hidden = !open;
+  $("#pit-foot").hidden = !open;
+  $("#syscheck").hidden = !open;
   authForm.hidden = open;
 }
 
-function clock(iso, timeZone) {
-  if (!iso) return "not set";
-  return new Intl.DateTimeFormat("en-US", {
+function short(iso) {
+  if (!iso) return "—";
+  return new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", minute: "2-digit", hour12: true })
+    .formatToParts(new Date(iso))
+    .filter((part) => part.type === "hour" || part.type === "minute" || part.type === "literal")
+    .map((part) => part.value)
+    .join("")
+    .trim();
+}
+
+function tickClock() {
+  const now = new Date(Date.now() + clockOffset);
+  const parts = {};
+  for (const part of new Intl.DateTimeFormat("en-US", {
     timeZone,
     hour: "numeric",
     minute: "2-digit",
-  }).format(new Date(iso));
+    hour12: true,
+    timeZoneName: "short",
+  }).formatToParts(now)) {
+    parts[part.type] = part.value;
+  }
+  $("#pit-clock").textContent = `${parts.hour}:${parts.minute}`;
+  $("#pit-zone").textContent = `${parts.dayPeriod || ""} ${parts.timeZoneName || ""}`.trim();
 }
 
 function cue(card, now) {
   const eta = new Date(card.eta_timestamp);
   const ready = card.ready_by ? new Date(card.ready_by) : null;
-  if (card.status === "cooking" && ready && ready < now) return { label: "Overdue", kind: "overdue" };
+  if (card.status === "cooking" && ready && ready < now) {
+    const late = Math.max(1, Math.round((now - ready) / 60_000));
+    return { label: `Overdue ${late} min`, kind: "overdue" };
+  }
   if (card.status === "ready" && eta.getTime() + 10 * 60_000 < now.getTime()) return { label: "Car is late", kind: "late" };
   if (card.status === "confirmed" && eta < now) return { label: "ETA passed", kind: "late" };
   if (card.guest_here) return { label: "At the stall", kind: "ok" };
   return null;
 }
 
-function renderLane(node, cards, timeZone, now) {
-  node.replaceChildren();
+function timesRow(pairs) {
+  const row = node("div", "tc-times");
+  for (const [label, value, tone] of pairs) {
+    const span = node("span", "", `${label} `);
+    span.append(node("strong", tone || "", value));
+    row.append(span);
+  }
+  return row;
+}
+
+function renderCard(card, now) {
+  const flag = cue(card, now);
+  const article = node("article", "ticket-card");
+  if (card.status === "cooking") article.classList.add("firing");
+  if (card.status === "ready") article.classList.add("ready");
+  if (flag?.kind === "overdue") article.classList.add("overdue");
+  if (flag?.kind === "late") article.classList.add("late");
+
+  const top = node("div", "tc-top");
+  const car = [card.car_color, card.car_model].filter(Boolean).join(" ");
+  const who = node("span", "tc-who", car ? `${car} · ${card.customer_name}` : card.customer_name);
+  who.style.setProperty("--swatch", COLORS[card.car_color] || "#d9cbb8");
+  top.append(node("span", "tc-num", card.order_number), who);
+  article.append(top);
+  if (flag) article.append(node("span", flag.kind === "ok" ? "tc-flag ok" : flag.kind === "late" ? "tc-flag warn" : "tc-flag", flag.label));
+  article.append(node("p", "tc-plate", card.car_plate));
+  article.append(node("p", "tc-items", card.items.map((item) => `${item.qty} × ${item.name}`).join(", ")));
+  if (card.special_notes) article.append(node("p", "tc-note", `Note: ${card.special_notes}`));
+
+  if (card.status === "confirmed") {
+    article.append(timesRow([
+      ["Arrive", short(card.eta_timestamp), ""],
+      ["Fire", card.kitchen_start_at ? short(card.kitchen_start_at) : "not timed", "red"],
+    ]));
+  } else if (card.status === "cooking") {
+    const start = card.kitchen_start_at ? Date.parse(card.kitchen_start_at) : now.getTime();
+    const end = card.ready_by ? Date.parse(card.ready_by) : start;
+    const pct = end > start ? Math.max(0, Math.min(100, ((now.getTime() - start) / (end - start)) * 100)) : 100;
+    const bar = node("div", "tc-bar");
+    bar.setAttribute("role", "progressbar");
+    bar.setAttribute("aria-label", "Cook progress");
+    bar.setAttribute("aria-valuenow", String(Math.round(pct)));
+    bar.setAttribute("aria-valuemin", "0");
+    bar.setAttribute("aria-valuemax", "100");
+    const fill = node("div");
+    fill.style.width = `${pct.toFixed(1)}%`;
+    bar.append(fill);
+    article.append(bar, timesRow([
+      ["Fired", short(card.kitchen_start_at), ""],
+      ["Ready by", short(card.ready_by), "green"],
+    ]));
+    const button = node("button", "pit-btn", "Mark ready");
+    button.type = "button";
+    button.addEventListener("click", () => postStatus(card.id, "ready", button));
+    article.append(button);
+  } else {
+    article.append(timesRow([
+      ["Ready", short(card.ready_by), "green"],
+      ["Arrive", short(card.eta_timestamp), ""],
+    ]));
+    const button = node("button", "pit-btn dark", "Picked up");
+    button.type = "button";
+    button.addEventListener("click", () => postStatus(card.id, "picked-up", button));
+    article.append(button);
+  }
+  return article;
+}
+
+function renderLane(key, cards, now, emptyText) {
+  counts[key].textContent = String(cards.length);
+  lanes[key].replaceChildren();
   if (cards.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "empty";
-    empty.textContent = "Nothing in this lane.";
-    node.append(empty);
+    lanes[key].append(node("p", "empty", emptyText));
     return;
   }
-  for (const card of cards) {
-    const article = document.createElement("article");
-    const flag = cue(card, now);
-    article.className = "card";
-    if (flag?.kind === "overdue") article.classList.add("overdue");
-    if (flag?.kind === "late") article.classList.add("late");
-    if (card.status === "ready") article.classList.add("ready-card");
-
-    const number = document.createElement("p");
-    number.className = "meta";
-    number.textContent = card.order_number;
-    if (flag) {
-      const chip = document.createElement("span");
-      chip.className = flag.kind === "ok" ? "flag ok" : flag.kind === "late" ? "flag warn" : "flag";
-      chip.textContent = flag.label;
-      number.prepend(chip, " ");
-    }
-    const plate = document.createElement("p");
-    plate.className = "plate";
-    plate.textContent = card.car_plate;
-    const who = document.createElement("p");
-    const car = `${card.car_color} ${card.car_model}`.trim();
-    who.textContent = car ? `${card.customer_name} · ${car}` : card.customer_name;
-    const items = document.createElement("p");
-    items.textContent = card.items.map((item) => `${item.qty} × ${item.name}`).join(", ");
-    const etaLine = document.createElement("p");
-    etaLine.className = "meta";
-    etaLine.textContent = `ETA ${card.eta_time}`;
-    const fireLine = document.createElement("p");
-    fireLine.className = "meta";
-    fireLine.textContent = `Fire ${clock(card.kitchen_start_at, timeZone)} · Ready ${clock(card.ready_by, timeZone)}`;
-    article.append(number, plate, who, items, etaLine, fireLine);
-    if (card.decision_changes?.[0]) {
-      const change = document.createElement("p");
-      change.className = "meta";
-      change.textContent = card.decision_changes[0];
-      article.append(change);
-    }
-    if (card.special_notes) {
-      const notes = document.createElement("p");
-      notes.textContent = card.special_notes;
-      article.append(notes);
-    }
-
-    if (card.status === "cooking") {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = "Mark ready";
-      button.addEventListener("click", () => postStatus(card.id, "ready", button));
-      article.append(button);
-    }
-    if (card.status === "ready") {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "dark";
-      button.textContent = "Picked up";
-      button.addEventListener("click", () => postStatus(card.id, "picked-up", button));
-      article.append(button);
-    }
-    node.append(article);
-  }
+  for (const card of cards) lanes[key].append(renderCard(card, now));
 }
 
 async function postStatus(id, action, button) {
@@ -149,31 +195,37 @@ async function refresh() {
       return;
     }
     if (!response.ok) throw new Error("The board did not load.");
+    const data = await response.json();
     showBoard(true);
-    const board = await response.json();
-    const now = new Date(board.as_of);
-    renderLane(lanes.waiting, board.waiting, board.timezone, now);
-    renderLane(lanes.firing, board.firing, board.timezone, now);
-    renderLane(lanes.ready, board.ready, board.timezone, now);
-    const when = new Intl.DateTimeFormat("en-US", {
-      timeZone: board.timezone,
-      hour: "numeric",
-      minute: "2-digit",
-      second: "2-digit",
-    }).format(now);
-    statusLine.textContent = `${board.drive_in} · ${when} · ${board.waiting.length} waiting · ${board.firing.length} firing · ${board.ready.length} ready`;
+    timeZone = data.timezone || timeZone;
+    const now = new Date(data.as_of);
+    clockOffset = now.getTime() - Date.now();
+    tickClock();
+    renderLane("waiting", data.waiting, now, "Nothing waiting.");
+    renderLane("firing", data.firing, now, "Nothing on the grill.");
+    renderLane("ready", data.ready, now, "Nothing bagged.");
+    if (typeof data.picked_up_today === "number") $("#chip-done").textContent = String(data.picked_up_today);
+    if (Array.isArray(data.sandbox_flags)) renderFlags(data.sandbox_flags);
+    statusLine.textContent = `${data.drive_in} · ${data.waiting.length} waiting · ${data.firing.length} firing · ${data.ready.length} ready`;
   } catch (error) {
     statusLine.textContent = error instanceof Error ? error.message : "The board is unavailable.";
   }
 }
 
-function showOut(lines) {
-  drillOut.hidden = false;
-  drillOut.textContent = lines.join("\n");
+let flagsKey = "";
+function renderFlags(flags) {
+  const key = flags.join(" ");
+  if (key === flagsKey) return;
+  flagsKey = key;
+  const wrap = $("#flags");
+  wrap.replaceChildren(...flags.map((flag) => node("span", "", flag)));
+  $("#docker-cmd").textContent = `docker run --rm -i ${flags.join(" ").replace("no-new-privileges", "--security-opt no-new-privileges")} route66-fire-solver`;
 }
 
 drillButton.addEventListener("click", async () => {
   drillButton.disabled = true;
+  const result = $("#filter-result");
+  result.replaceChildren(node("span", "verdict idle", "RUNNING"), node("span", "", "Sending the note through the solver…"));
   try {
     const response = await kitchenFetch("/api/agent/schedule", {
       method: "POST",
@@ -181,65 +233,94 @@ drillButton.addEventListener("click", async () => {
       body: JSON.stringify({ containment_drill: true }),
     });
     const body = await response.json();
+    if (!response.ok) throw new Error(body.error || "The note filter did not run.");
     const decision = body.decision ?? {};
-    showOut([
-      "Note filter. This is not a container boundary test.",
-      `containment: ${decision.containment ?? "n/a"}`,
-      `executed_payload: ${decision.executed_payload ?? "n/a"}`,
-      `isolation: ${body.isolation ?? "n/a"}`,
-      `mode: ${body.explanation?.mode ?? "n/a"}`,
-      body.error || decision.reason || "",
-      body.explanation?.text || "",
-    ]);
+    const refused = decision.containment === "hostile-refused" && decision.executed_payload === false;
+    const verdict = node("span", refused ? "verdict" : "verdict ok", refused ? "REFUSED" : String(decision.containment || "n/a").toUpperCase());
+    const detail = refused
+      ? `Shell-like string. Nothing executed. Isolation: ${body.isolation ?? "none"}. A filter, not a container proof.`
+      : decision.reason || "The filter did not refuse this note.";
+    result.replaceChildren(verdict, node("span", "", detail));
   } catch (error) {
-    showOut([error instanceof Error ? error.message : "The note filter failed."]);
+    result.replaceChildren(node("span", "verdict", "ERROR"), node("span", "", error instanceof Error ? error.message : "The note filter failed."));
   } finally {
     drillButton.disabled = false;
   }
 });
 
+function probeRows(report) {
+  return [
+    ["whoami", `uid=${report.uid}${report.root ? " (root)" : " (node), no capabilities"}`, !report.root && report.uid > 0],
+    ["connect 1.1.1.1:80", report.network || "no answer", report.network !== "connected"],
+    ["write /etc/pwned", report.write_etc || "no answer", report.write_etc !== "ok"],
+    ["write /sandbox/pwned", report.write_sandbox || "no answer", report.write_sandbox !== "ok"],
+    ["read /etc/shadow", report.read_shadow || "no answer", report.read_shadow !== "ok"],
+    ["read /host-canary", report.host_canary || "no answer", report.host_canary !== "ok"],
+    ["env VULTR_INFERENCE_API_KEY", report.secret_present ? "present" : "absent in container", !report.secret_present],
+    ["write /tmp (tmpfs, noexec)", report.tmp_write ? "ok, scratch only" : "refused", null],
+  ];
+}
+
+function probeLine(key, value, held) {
+  const line = node("div", "probe-line");
+  const badge = node("span", held === null ? "held info" : held ? "held" : "held broke", held === null ? "ALLOWED" : held ? "HELD" : "BROKEN");
+  line.append(node("span", "k", key), node("span", "v", value), badge);
+  return line;
+}
+
 probeButton.addEventListener("click", async () => {
+  clearInterval(probeTimer);
   probeButton.disabled = true;
+  probeButton.textContent = "Probing…";
+  const lines = $("#probe-lines");
+  const terminal = $("#terminal");
+  lines.replaceChildren();
+  terminal.querySelector(".term-done")?.remove();
+  terminal.querySelector(".term-error")?.remove();
+  $("#term-idle").hidden = true;
+  const finish = () => {
+    probeButton.disabled = false;
+    probeButton.textContent = "Run again";
+  };
   try {
     const response = await kitchenFetch("/api/agent/containment", { method: "POST" });
     const body = await response.json();
-    if (!response.ok || body.verified !== true) {
-      showOut([
-        "Sandbox probe did not run.",
-        `isolation: ${body.isolation ?? "none"}`,
-        `verified: false`,
-        body.error || "Probe unavailable.",
-      ]);
+    if (!response.ok || !body.report) {
+      const box = node("div", "term-error");
+      box.append(
+        node("div", "", "Sandbox probe did not run."),
+        node("div", "", `isolation: ${body.isolation ?? "none"} · verified: false`),
+        node("div", "", body.error || "Probe unavailable."),
+      );
+      terminal.append(box);
+      finish();
       return;
     }
-    const report = body.report ?? {};
-    showOut([
-      `verified: ${body.verified}`,
-      `uid: ${report.uid}`,
-      `root: ${report.root}`,
-      `secret_present: ${report.secret_present}`,
-      `network: ${report.network}`,
-      `write_sandbox: ${report.write_sandbox}`,
-      `write_etc: ${report.write_etc}`,
-      `host_canary: ${report.host_canary}`,
-      `boundaries_held: ${report.boundaries_held}`,
-    ]);
+    const rows = probeRows(body.report);
+    let shown = 0;
+    probeTimer = setInterval(() => {
+      if (shown >= rows.length) {
+        clearInterval(probeTimer);
+        const done = node("div", "term-done");
+        const left = node("div");
+        const held = body.report.boundaries_held === true;
+        left.append(node("div", "path", "POST /api/agent/containment"), node("div", held ? "big" : "big bad", `boundaries_held: ${held}`));
+        const right = node("div", "side-r");
+        right.append(node("div", "", `verified: ${body.verified === true}`), node("div", "", `isolation: ${body.isolation}`));
+        done.append(left, right);
+        terminal.append(done);
+        finish();
+        return;
+      }
+      lines.append(probeLine(...rows[shown]));
+      shown += 1;
+    }, 420);
   } catch (error) {
-    showOut([error instanceof Error ? error.message : "The probe failed."]);
-  } finally {
-    probeButton.disabled = false;
+    const box = node("div", "term-error", error instanceof Error ? error.message : "The probe failed.");
+    terminal.append(box);
+    finish();
   }
 });
-
-try {
-  const health = await fetch("/api/health");
-  const status = await health.json();
-  banner.textContent = status.inference_mode === "live"
-    ? "Live wording is on. Grill times still come from the kitchen clock."
-    : "Demo service. Grill times are calculated here, not by a live model.";
-} catch {
-  banner.textContent = "Service status did not load.";
-}
 
 authForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -247,5 +328,19 @@ authForm.addEventListener("submit", (event) => {
   refresh();
 });
 
+try {
+  const health = await fetch("/api/health");
+  const status = await health.json();
+  $("#chip-mode").textContent = status.inference_mode ?? "unknown";
+  $("#chip-runner").textContent = status.runner ?? "unknown";
+  const verified = status.live_call_verified === true;
+  $("#chip-live").textContent = String(verified);
+  $("#chip-live").className = verified ? "ok" : "warn";
+} catch {
+  statusLine.textContent = "Service status did not load.";
+}
+
+tickClock();
+setInterval(tickClock, 1000);
 await refresh();
 setInterval(refresh, 3000);

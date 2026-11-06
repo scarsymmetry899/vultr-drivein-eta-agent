@@ -235,6 +235,9 @@ test("guest ticket is priced, scheduled, and rushed onto the board", async () =>
     const picked = await fetch(`${base}/api/orders/${order.id}/picked-up`, pit({ method: "POST" }));
     assert.equal(picked.status, 200);
     assert.equal((await picked.json()).order.status, "completed");
+    const closedBoard = await (await fetch(`${base}/api/kitchen/board`, pit())).json();
+    assert.equal(closedBoard.picked_up_today, 1);
+    assert.ok(closedBoard.sandbox_flags.includes("--network=none"));
 
     const probe = await fetch(`${base}/api/agent/containment`, pit({ method: "POST" }));
     assert.equal(probe.status, 200);
