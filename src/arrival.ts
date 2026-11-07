@@ -82,8 +82,17 @@ export function assessApproach(input: {
   }
   const lat = input.lat;
   const lng = input.lng;
-  if (typeof lat !== "number" || typeof lng !== "number" || !Number.isFinite(lat) || !Number.isFinite(lng)) {
-    return { credible: false, code: "bad-fix", note: "The browser reading had no position. The scheduled fire was left in place." };
+  if (
+    typeof lat !== "number" ||
+    typeof lng !== "number" ||
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng) ||
+    lat < -90 ||
+    lat > 90 ||
+    lng < -180 ||
+    lng > 180
+  ) {
+    return { credible: false, code: "bad-fix", note: "The browser reading had no usable position. The scheduled fire was left in place." };
   }
   const distance = distanceMeters(lat, lng, input.lotLat, input.lotLng);
   if (distance > OUTLIER_M) {

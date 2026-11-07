@@ -169,21 +169,23 @@ export function findOrder(orderNumber: string, carPlate: string): DriveInOrder |
 }
 
 /**
- * Due scheduled fires move to cooking unless staff are holding the ticket.
- * Passing ready_by does not mark the bag ready. That stays a staff action.
+ * Due scheduled fires move to cooking unless staff are holding the ticket
+ * or the grill is already full. Passing ready_by does not mark the bag ready.
  * The long-running server calls this every few seconds. A read of one ticket does too.
  */
 export function promoteDueFires(now = new Date()): string[] {
   const stamp = now.toISOString();
   const due = openDatabase()
     .prepare(
-      `SELECT id FROM drivein_orders
+      `SELECT id, kitchen_start_at FROM drivein_orders
        WHERE status = 'confirmed' AND fire_hold = 0
-         AND kitchen_start_at IS NOT NULL AND kitchen_start_at <= ?`,
+         AND kitchen_start_at IS NOT NULL AND kitchen_start_at <= ?
+       ORDER BY kitchen_start_at, created_at, id`,
     )
-    .all(stamp) as { id: string }[];
+    .all(stamp) as { id: string; kitchen_start_at: string }[];
   const started: string[] = [];
   for (const row of due) {
+    if (cookingCount() >= loadConfig().capacity) break;
     const result = openDatabase()
       .prepare(
         `UPDATE drivein_orders SET status = 'cooking', updated_at = ?
@@ -192,12 +194,15 @@ export function promoteDueFires(now = new Date()): string[] {
       )
       .run(stamp, row.id, stamp);
     if (Number(result.changes) !== 1) continue;
+    const late = now.getTime() - Date.parse(row.kitchen_start_at) > 5_000;
     remember(row.id, {
       at: stamp,
       actor: "solver",
       step: "auto_fire",
       result: "done",
-      note: "The scheduled fire time arrived. Cooking started. Kitchen staff still mark the bag ready.",
+      note: late
+        ? "Cooking started later than planned. The displayed fire and ready-by times are the original estimates, not a readiness promise. Staff must reassess timing and mark the bag ready."
+        : "The scheduled fire time arrived. Cooking started. Kitchen staff still mark the bag ready.",
     });
     started.push(row.id);
   }
@@ -244,7 +249,7 @@ export function applySchedule(
       patch.buffer_minutes,
       patch.reason,
       patch.decision_trail,
-      patch.status,
+      "confirmed",
       stamp,
       id,
     );
@@ -274,6 +279,13 @@ export function markHere(id: string): DriveInOrder | undefined {
   const now = new Date();
   const stamp = now.toISOString();
   const db = openDatabase();
+  if (existing.status === "confirmed" && cookingCount() >= loadConfig().capacity) {
+    db.prepare(
+      `UPDATE drivein_orders SET guest_here = 1, arrived_at = COALESCE(arrived_at, ?),
+        schedule_reason = ?, updated_at = ? WHERE id = ? AND status = 'confirmed'`,
+    ).run(stamp, "The kitchen is at capacity. Staff must free a grill slot before this ticket can start.", stamp, id);
+    return readOrder(id);
+  }
   if (existing.status === "confirmed") {
     const prep = existing.prep_minutes ?? ticketPrepMinutes(existing.items);
     const ready = new Date(now.getTime() + prep * 60_000).toISOString();
@@ -452,6 +464,13 @@ export function staffStart(id: string): { order: DriveInOrder | undefined; chang
   if (!existing) return { order: undefined, changed: false, note: "Order not found." };
   if (existing.status !== "confirmed") {
     return { order: existing, changed: false, note: "The grill has already moved on." };
+  }
+  if (cookingCount() >= loadConfig().capacity) {
+    return {
+      order: existing,
+      changed: false,
+      note: "The kitchen is at capacity. Mark a finished bag ready before starting this ticket. The hold was left unchanged.",
+    };
   }
   openDatabase().prepare(`UPDATE drivein_orders SET fire_hold = 0, updated_at = ? WHERE id = ? AND status = 'confirmed'`).run(new Date().toISOString(), id);
   const open = readOrder(id);
@@ -690,6 +709,7 @@ function toCard(order: DriveInOrder, now: Date): BoardCard {
     ready_by: order.ready_by,
     eta_timestamp: order.eta_timestamp,
     now,
+    fire_hold: order.fire_hold,
   });
   const actions = order.decision_trail?.actions ?? [];
   return {

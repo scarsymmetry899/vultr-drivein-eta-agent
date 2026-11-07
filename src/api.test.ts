@@ -426,6 +426,20 @@ test("guest ticket is priced, scheduled, and rushed onto the board", async () =>
     const windowOrder = farBody.order;
     assert.equal(windowOrder.payment_state, "pay_at_window");
 
+    const overduePast = new Date(Date.now() - 60_000).toISOString();
+    process.env.KITCHEN_CAPACITY = "8";
+    openDatabase()
+      .prepare(
+        `UPDATE drivein_orders
+         SET status = 'confirmed', kitchen_start_at = ?, ready_by = ?, updated_at = ?
+         WHERE id = ?`,
+      )
+      .run(overduePast, overduePast, overduePast, order.id);
+    const overdueBoard = await (await fetch(`${base}/api/kitchen/board`, pit())).json();
+    assert.equal(overdueBoard.ready.some((card: { id: string }) => card.id === order.id), false);
+    const overdueFired = overdueBoard.firing.find((card: { id: string }) => card.id === order.id);
+    assert.ok(overdueFired);
+    assert.match(overdueFired.exception ?? "", /will not mark it ready by itself/);
   } finally {
     await new Promise<void>((resolve, reject) => {
       server.close((error) => (error ? reject(error) : resolve()));

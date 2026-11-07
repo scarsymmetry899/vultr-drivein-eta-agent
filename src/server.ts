@@ -319,7 +319,7 @@ export function createApp(): express.Express {
       res.status(404).json({ error: "Order not found." });
       return;
     }
-    if (result.order.status !== "confirmed") {
+    if (!result.changed && result.order.status !== "confirmed") {
       res.status(409).json({ error: "Only a waiting ticket can be held or released.", order: result.order });
       return;
     }
@@ -375,6 +375,13 @@ export function createApp(): express.Express {
     }
     if (order.fire_hold && order.status === "confirmed") {
       res.status(409).json({ error: "Kitchen staff are holding this fire. The stall check-in did not start cooking.", order });
+      return;
+    }
+    if (order.status === "confirmed" && order.guest_here) {
+      res.status(409).json({
+        error: "Your arrival was recorded, but the kitchen is at capacity. Staff must free a grill slot before this ticket can start.",
+        order,
+      });
       return;
     }
     if (order.status === "completed" || order.status === "no_show") {

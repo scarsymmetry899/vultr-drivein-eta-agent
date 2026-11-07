@@ -1,3 +1,7 @@
+declare module "*arrival-label.js" {
+  export function arrivalSlotLabel(slot: Date, now?: Date, timeZone?: string): string;
+}
+
 declare module "*clocks.js" {
   export function presentIsoClocks(text: string, timeZone?: string): string;
   export function serviceFootnote(

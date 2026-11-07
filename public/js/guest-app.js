@@ -1,3 +1,4 @@
+import { arrivalSlotLabel } from "./arrival-label.js";
 import { presentIsoClocks, serviceFootnote } from "./clocks.js";
 import { foodMark } from "./icons.js";
 
@@ -447,8 +448,7 @@ function arrivalPanel() {
     button.type = "button";
     button.setAttribute("role", "radio");
     button.setAttribute("aria-checked", on ? "true" : "false");
-    const overnight = austinWeekday(slot) !== austinWeekday(new Date());
-    button.textContent = overnight ? `${localParts(slot).time} ${austinWeekday(slot)}` : localParts(slot).time;
+    button.textContent = arrivalSlotLabel(slot);
     button.setAttribute("aria-label", `${shortLocal(slot)} ${dayLabel(slot)}`);
     button.addEventListener("click", () => {
       state.draft.eta = slot.toISOString();
@@ -942,6 +942,14 @@ function stepsCard(order) {
   }
   card.append(list);
   card.append(el("p", "fine", nextStep(order)));
+  if (order.status === "confirmed" && order.fire_hold) {
+    card.append(el("p", "fine", "Kitchen staff are holding the fire. Staff must release it or deliberately start cooking."));
+  } else if (
+    order.status === "confirmed" &&
+    ((order.kitchen_start_at && Date.parse(order.kitchen_start_at) <= Date.now()) || order.guest_here)
+  ) {
+    card.append(el("p", "fine", "The scheduled fire is due and cooking has not started. It starts when a grill slot is free."));
+  }
   if (state.notice) card.append(el("p", "fine", state.notice));
 
   const open = order.status !== "completed" && order.status !== "no_show";
@@ -1531,10 +1539,6 @@ function alwaysOpen() {
 function hoursLabel() {
   if (alwaysOpen()) return "24 hours, Austin time";
   return `${plainClock(state.menu?.open || "00:00")}–${plainClock(state.menu?.close || "24:00")} Austin time`;
-}
-
-function austinWeekday(date) {
-  return new Intl.DateTimeFormat("en-US", { timeZone: lotZone(), weekday: "short" }).format(date);
 }
 
 function plainClock(hhmm) {

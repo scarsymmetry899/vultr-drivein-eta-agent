@@ -43,6 +43,7 @@ export function serviceCue(input: {
   ready_by: string | null;
   eta_timestamp: string;
   now?: Date;
+  fire_hold?: boolean;
 }): ServiceCue {
   const now = input.now ?? new Date();
   const eta = Date.parse(input.eta_timestamp);
@@ -69,6 +70,20 @@ export function serviceCue(input: {
   }
   if (input.status === "completed") {
     return { owner: "kitchen", next_step: "Kitchen staff marked this picked up.", exception: null };
+  }
+  if (input.fire_hold) {
+    return {
+      owner: "kitchen",
+      next_step: "Staff must release the hold or deliberately start this ticket.",
+      exception: "Kitchen staff are holding the fire.",
+    };
+  }
+  if (input.kitchen_start_at && Date.parse(input.kitchen_start_at) <= now.getTime()) {
+    return {
+      owner: "kitchen",
+      next_step: "Staff must free a grill slot before this ticket can start.",
+      exception: "The scheduled fire is due, but the kitchen is at capacity. This ticket is still waiting.",
+    };
   }
   if (!input.kitchen_start_at) {
     return {
