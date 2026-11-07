@@ -5,7 +5,7 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { closeDatabase } from "./db.ts";
+import { closeDatabase, openDatabase } from "./db.ts";
 import { createApp } from "./server.ts";
 
 delete process.env.VULTR_INFERENCE_API_KEY;
@@ -284,6 +284,23 @@ test("guest ticket is priced, scheduled, and rushed onto the board", async () =>
     assert.equal(leftBody.order.status, "cooking");
     assert.equal(rightBody.order.status, "cooking");
     assert.equal(leftBody.order.kitchen_start_at, rightBody.order.kitchen_start_at);
+
+    const past = new Date(Date.now() - 60_000).toISOString();
+    openDatabase()
+      .prepare(
+        `UPDATE drivein_orders
+         SET status = 'confirmed', kitchen_start_at = ?, ready_by = ?, updated_at = ?
+         WHERE id = ?`,
+      )
+      .run(past, past, past, order.id);
+    const board = await (await fetch(`${base}/api/kitchen/board`, pit())).json();
+    assert.equal(board.ready.some((card: { id: string }) => card.id === order.id), false);
+    const fired = board.firing.find((card: { id: string }) => card.id === order.id);
+    assert.ok(fired);
+    assert.match(fired.exception ?? "", /will not mark it ready by itself/);
+    const stillCooking = await (await fetch(`${base}/api/kitchen/board`, pit())).json();
+    assert.ok(stillCooking.firing.some((card: { id: string }) => card.id === order.id));
+    assert.equal(stillCooking.ready.some((card: { id: string }) => card.id === order.id), false);
   } finally {
     await new Promise<void>((resolve, reject) => {
       server.close((error) => (error ? reject(error) : resolve()));

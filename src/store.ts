@@ -150,7 +150,10 @@ export function findOrder(orderNumber: string, carPlate: string): DriveInOrder |
   return row ? fromRow(row) : undefined;
 }
 
-/** Due fires move to cooking. Finished fires move to ready. Both updates are conditional. */
+/**
+ * Due fires move to cooking. Passing ready_by does not mark the bag ready.
+ * Kitchen staff do that. Picked up stays a staff action too.
+ */
 export function promote(now = new Date()): void {
   const db = openDatabase();
   const stamp = now.toISOString();
@@ -158,11 +161,6 @@ export function promote(now = new Date()): void {
     `UPDATE drivein_orders
      SET status = 'cooking', updated_at = ?
      WHERE status = 'confirmed' AND kitchen_start_at IS NOT NULL AND kitchen_start_at <= ?`,
-  ).run(stamp, stamp);
-  db.prepare(
-    `UPDATE drivein_orders
-     SET status = 'ready', updated_at = ?
-     WHERE status = 'cooking' AND ready_by IS NOT NULL AND ready_by <= ?`,
   ).run(stamp, stamp);
 }
 
