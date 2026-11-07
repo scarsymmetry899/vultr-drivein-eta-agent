@@ -79,3 +79,5 @@ After the service is healthy, record containment on the VM with `bash /opt/route
 
 Guest: `http://65.20.93.98:8080/`
 Kitchen: `http://65.20.93.98:8080/kitchen.html` with the existing token in `/root/route66-kitchen-token.txt`.
+
+The operator reported that this update had been run, and that `HEAD` was `6704bcc5801b11b253fdfdd51d64fd24cfeae709`, at 13:45:56 IST on 7 Nov 2026. See [`DEPLOYED.md`](DEPLOYED.md). Do not paste the block again unless a later commit is on `main`.
