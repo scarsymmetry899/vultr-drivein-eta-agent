@@ -106,7 +106,7 @@ npm test
 npm run dev
 ```
 
-Open `http://localhost:8080` for the guest page and `http://localhost:8080/kitchen.html` for the board. The demo window is 11:00–22:00 America/Chicago. An arrival outside that window is refused when you schedule.
+Open `http://localhost:8080` for the guest page and `http://localhost:8080/kitchen.html` for the board. The default lot is open 24 hours in America/Chicago, including midnight and both sides of a daylight-saving change. A past arrival is still refused. The deployed VM keeps whatever `DRIVEIN_OPEN` and `DRIVEIN_CLOSE` are in its `.env`. Those were `11:00` and `22:00` when the machine was first installed. This code does not change that file.
 
 ```bash
 npm run sandbox:solve

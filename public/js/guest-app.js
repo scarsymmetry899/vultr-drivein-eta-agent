@@ -447,6 +447,8 @@ function arrivalPanel() {
     button.type = "button";
     button.setAttribute("role", "radio");
     button.setAttribute("aria-checked", on ? "true" : "false");
+    const overnight = austinWeekday(slot) !== austinWeekday(new Date());
+    button.textContent = overnight ? `${localParts(slot).time} ${austinWeekday(slot)}` : localParts(slot).time;
     button.setAttribute("aria-label", `${shortLocal(slot)} ${dayLabel(slot)}`);
     button.addEventListener("click", () => {
       state.draft.eta = slot.toISOString();
@@ -1515,13 +1517,24 @@ function lotZone() {
 }
 
 function hoursRange() {
-  const [openH, openM] = (state.menu?.open || "11:00").split(":").map(Number);
-  const [closeH, closeM] = (state.menu?.close || "22:00").split(":").map(Number);
+  const open = state.menu?.open || "00:00";
+  const close = state.menu?.close || "24:00";
+  const [openH, openM] = open.split(":").map(Number);
+  const [closeH, closeM] = close.split(":").map(Number);
   return [openH * 60 + openM, closeH * 60 + closeM];
 }
 
+function alwaysOpen() {
+  return (state.menu?.open || "00:00") === "00:00" && (state.menu?.close || "24:00") === "24:00";
+}
+
 function hoursLabel() {
-  return `${plainClock(state.menu?.open || "11:00")}–${plainClock(state.menu?.close || "22:00")} Austin time`;
+  if (alwaysOpen()) return "24 hours, Austin time";
+  return `${plainClock(state.menu?.open || "00:00")}–${plainClock(state.menu?.close || "24:00")} Austin time`;
+}
+
+function austinWeekday(date) {
+  return new Intl.DateTimeFormat("en-US", { timeZone: lotZone(), weekday: "short" }).format(date);
 }
 
 function plainClock(hhmm) {
@@ -1545,6 +1558,7 @@ function austinMinutes(date) {
 }
 
 function outsideAustinHours(date) {
+  if (alwaysOpen()) return false;
   const [open, close] = hoursRange();
   const minutes = austinMinutes(date);
   return minutes < open || minutes > close;

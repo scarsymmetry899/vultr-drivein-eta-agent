@@ -30,8 +30,8 @@ export function loadConfig(): AppConfig {
     driveIn: process.env.DRIVEIN_NAME?.trim() || "Route 66 Drive-In",
     city: process.env.DRIVEIN_CITY?.trim() || "Austin, TX",
     timezone: timeZone(process.env.DRIVEIN_TIMEZONE),
-    open: clock(process.env.DRIVEIN_OPEN, "11:00", "DRIVEIN_OPEN"),
-    close: clock(process.env.DRIVEIN_CLOSE, "22:00", "DRIVEIN_CLOSE"),
+    open: clock(process.env.DRIVEIN_OPEN, "00:00", "DRIVEIN_OPEN"),
+    close: clock(process.env.DRIVEIN_CLOSE, "24:00", "DRIVEIN_CLOSE"),
     lat: floatInRange(process.env.DRIVEIN_LAT, 30.25, -90, 90, "DRIVEIN_LAT"),
     lng: floatInRange(process.env.DRIVEIN_LNG, -97.749, -180, 180, "DRIVEIN_LNG"),
     salesTaxRate: floatInRange(process.env.SALES_TAX_RATE, 0.0825, 0, 0.25, "SALES_TAX_RATE"),
@@ -85,8 +85,9 @@ function inferenceMode(raw: string | undefined): "demo" | "live" {
 
 function clock(raw: string | undefined, fallback: string, name: string): string {
   const value = raw?.trim() || fallback;
+  if (name === "DRIVEIN_CLOSE" && value === "24:00") return value;
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) {
-    throw new Error(`${name} must be HH:MM.`);
+    throw new Error(`${name} must be HH:MM, or 24:00 for close.`);
   }
   return value;
 }

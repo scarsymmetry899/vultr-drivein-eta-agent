@@ -6,8 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { closeDatabase, openDatabase } from "./db.ts";
-import { applyApproach, promoteDueFires } from "./store.ts";
-import { loadConfig } from "./config.ts";
+import { promoteDueFires } from "./store.ts";
 import { createApp } from "./server.ts";
 
 delete process.env.VULTR_INFERENCE_API_KEY;
@@ -85,13 +84,29 @@ test("guest ticket is priced, scheduled, and rushed onto the board", async () =>
         items: [{ sku: "classic-burger", qty: 1 }],
       }),
     });
-    assert.equal(closed.status, 400);
-    assert.match((await closed.json()).error, /outside open hours/);
+    assert.equal(closed.status, 201);
+    const overnight = await closed.json();
+    assert.equal(overnight.order.status, "confirmed");
+    const pastArrival = await fetch(`${base}/api/orders`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        customer_name: "Mina Cole",
+        car_plate: "TX-4401",
+        car_color: "blue",
+        eta: new Date(Date.now() - 30 * 60_000).toISOString(),
+        items: [{ sku: "classic-burger", qty: 1 }],
+      }),
+    });
+    assert.equal(pastArrival.status, 400);
+    assert.match((await pastArrival.json()).error, /already in the past/);
 
     const menu = await (await fetch(`${base}/api/menu`)).json();
     const rings = menu.items.find((item: { sku: string }) => item.sku === "onion-rings");
     assert.equal(rings.available, false);
     assert.equal(menu.currency, "USD");
+    assert.equal(menu.open, "00:00");
+    assert.equal(menu.close, "24:00");
 
     const soldOut = await fetch(`${base}/api/orders`, {
       method: "POST",
@@ -411,33 +426,6 @@ test("guest ticket is priced, scheduled, and rushed onto the board", async () =>
     const windowOrder = farBody.order;
     assert.equal(windowOrder.payment_state, "pay_at_window");
 
-    const night = await fetch(`${base}/api/orders`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        customer_name: "Mina Cole",
-        car_plate: "TX-8804",
-        car_color: "black",
-        eta: futureEta(),
-        arrival_opt_in: true,
-        items: [{ sku: "classic-burger", qty: 1 }],
-      }),
-    });
-    const nightId = (await night.json()).order.id;
-    await fetch(`${base}/api/agent/schedule`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ order_id: nightId }),
-    });
-    const closedApproach = applyApproach(
-      nightId,
-      { credible: true, code: "sim-close", note: "Simulated close arrival." },
-      loadConfig(),
-      new Date("2026-11-07T04:30:00.000Z"),
-    );
-    assert.equal(closedApproach.applied, false);
-    assert.equal(closedApproach.code, "closed");
-    assert.equal(closedApproach.order?.status, "confirmed");
   } finally {
     await new Promise<void>((resolve, reject) => {
       server.close((error) => (error ? reject(error) : resolve()));

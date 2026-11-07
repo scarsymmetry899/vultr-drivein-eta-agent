@@ -107,10 +107,15 @@ export function ticketPrepMinutes(items: SolverItem[]): number {
   return prep;
 }
 
+/** 00:00–24:00 means every Chicago instant is open, including midnight and both sides of a daylight-saving change. */
+export function alwaysOpenHours(open: string, close: string): boolean {
+  return open === "00:00" && close === "24:00";
+}
+
 /**
  * Lot hours are wall-clock times in `timeZone` on the arrival's calendar day.
- * 11:00 and 22:00 are Austin hours, not the guest's phone hours.
  * Exactly at open or close is inside. One minute outside is not.
+ * 00:00 and 24:00 together cover the whole civil day, so the next midnight is still open.
  */
 export function describeArrivalHours(
   eta: Date,
@@ -119,6 +124,9 @@ export function describeArrivalHours(
   timeZone: string,
 ): { ok: true; label: string } | { ok: false; reason: string } {
   if (Number.isNaN(eta.getTime())) return { ok: false, reason: "Enter an arrival time." };
+  if (alwaysOpenHours(open, close)) {
+    return { ok: true, label: formatClock(eta, timeZone) };
+  }
   let window: { open: Date; close: Date };
   try {
     window = wallClockWindow(eta, open, close, timeZone);
@@ -171,30 +179,31 @@ export function solveFireTime(input: SolveInput): SolveResult {
   const now = new Date(input.now);
   const warnings: string[] = [];
 
-  let open: Date;
-  let close: Date;
-  try {
-    const wall = wallClockWindow(eta, input.open, input.close, input.timezone);
-    open = wall.open;
-    close = wall.close;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not read open hours.";
-    return rejected(message, prep, buffer, warnings);
+  const allDay = alwaysOpenHours(input.open, input.close);
+  let open: Date | null = null;
+  let close: Date | null = null;
+  if (!allDay) {
+    try {
+      const wall = wallClockWindow(eta, input.open, input.close, input.timezone);
+      open = wall.open;
+      close = wall.close;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not read open hours.";
+      return rejected(message, prep, buffer, warnings);
+    }
   }
 
   const active = readActiveFires(input.active_fires ?? [], warnings);
-  const openLabel = formatClock(open, input.timezone);
-  const closeLabel = formatClock(close, input.timezone);
   const hours = describeArrivalHours(eta, input.open, input.close, input.timezone);
   if (!hours.ok) return rejected(hours.reason, prep, buffer, warnings);
 
   let fire = addMinutes(eta, -(prep + buffer));
   let ready = addMinutes(fire, prep);
 
-  if (fire.getTime() < open.getTime()) {
+  if (!allDay && open && fire.getTime() < open.getTime()) {
     fire = new Date(open.getTime());
     ready = addMinutes(fire, prep);
-    warnings.push(`Cooking cannot start before open (${openLabel}).`);
+    warnings.push(`Cooking cannot start before open (${formatClock(open, input.timezone)}).`);
   }
 
   if (fire.getTime() < now.getTime()) {
@@ -203,9 +212,9 @@ export function solveFireTime(input: SolveInput): SolveResult {
     warnings.push("The fire time had already passed, so the ticket fires immediately.");
   }
 
-  if (fire.getTime() >= close.getTime() || ready.getTime() > close.getTime()) {
+  if (!allDay && close && (fire.getTime() >= close.getTime() || ready.getTime() > close.getTime())) {
     return rejected(
-      `Ready time ${formatClock(ready, input.timezone)} is outside open hours (close ${closeLabel}).`,
+      `Ready time ${formatClock(ready, input.timezone)} is outside open hours (close ${formatClock(close, input.timezone)}).`,
       prep,
       buffer,
       warnings,
@@ -220,7 +229,7 @@ export function solveFireTime(input: SolveInput): SolveResult {
     }
     fire = addMinutes(fire, QUEUE_SLOT_MINUTES);
     ready = addMinutes(fire, prep);
-    if (fire.getTime() >= close.getTime() || ready.getTime() > close.getTime()) {
+    if (!allDay && close && (fire.getTime() >= close.getTime() || ready.getTime() > close.getTime())) {
       return rejected("Capacity would push this ticket past close.", prep, buffer, warnings);
     }
   }
@@ -305,9 +314,9 @@ function validate(input: SolveInput): string | null {
   if (!Number.isInteger(input.capacity_n) || input.capacity_n < 1 || input.capacity_n > 20) {
     return "capacity_n must be a whole number from 1 to 20.";
   }
-  if (!isClock(input.open) || !isClock(input.close)) return "Open and close must be HH:MM.";
-  if (clockMinutes(input.close) <= clockMinutes(input.open)) {
-    return "Close must be later than open on the same day.";
+  if (!isClock(input.open) || !isCloseClock(input.close)) return "Open and close must be HH:MM.";
+  if (!alwaysOpenHours(input.open, input.close) && clockMinutes(input.close) <= clockMinutes(input.open)) {
+    return "Close must be later than open on the same day. Use 00:00 and 24:00 for a lot that never closes.";
   }
   if (typeof input.timezone !== "string" || input.timezone.length < 1 || input.timezone.length > 64) {
     return "timezone is required.";
@@ -433,6 +442,10 @@ function addMinutes(instant: Date, minutes: number): Date {
 
 function isClock(value: string): boolean {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+function isCloseClock(value: string): boolean {
+  return value === "24:00" || isClock(value);
 }
 
 function parseClock(value: string): { hour: number; minute: number } {
