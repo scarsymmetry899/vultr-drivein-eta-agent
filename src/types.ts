@@ -36,6 +36,10 @@ export interface DriveInOrder {
   guest_here: boolean;
   arrived_at: string | null;
   schedule_reason: string | null;
+  fire_hold: boolean;
+  arrival_opt_in: boolean;
+  payment_state: import("./payment.ts").PaymentState;
+  payment_label: string;
   decision_trail: import("./decision-trail.ts").DecisionTrail | null;
   created_at: string;
   updated_at: string;
@@ -62,4 +66,6 @@ export interface NewOrderInput {
   subtotal_cents: number;
   sales_tax_cents: number;
   order_type: OrderType;
+  arrival_opt_in: boolean;
+  payment_state: import("./payment.ts").PaymentState;
 }

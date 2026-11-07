@@ -13,10 +13,17 @@ import {
   getOrder,
   kitchenBoard,
   listUnavailable,
+  applyApproach,
+  markDemoPayment,
   markHere,
   markPickedUp,
   markReady,
+  promoteDueFires,
+  setArrivalWatch,
+  setFireHold,
+  staffStart,
 } from "./store.ts";
+import { assessApproach } from "./arrival.ts";
 import { kitchenConfigured, kitchenTokenFrom, requireKitchen, authorizeKitchen } from "./kitchen-auth.ts";
 import { normalizePlate, parseOrderBody } from "./validate.ts";
 
@@ -234,6 +241,127 @@ export function createApp(): express.Express {
     }),
   );
 
+  app.post("/api/orders/:id/approach", (req, res) => {
+    const id = req.params.id;
+    if (!id) {
+      res.status(404).json({ error: "Order not found." });
+      return;
+    }
+    const body = req.body;
+    if (body === null || typeof body !== "object") {
+      res.status(400).json({ error: "Approach body must be an object." });
+      return;
+    }
+    const record = body as Record<string, unknown>;
+    const source = record.source;
+    if (source !== "sim-close" && source !== "sim-far" && source !== "device") {
+      res.status(400).json({ error: "Approach source must be sim-close, sim-far, or device." });
+      return;
+    }
+    if (typeof record.recorded_at !== "string") {
+      res.status(400).json({ error: "Approach needs a recorded_at timestamp." });
+      return;
+    }
+    const config = loadConfig();
+    const assessment = assessApproach({
+      source,
+      recordedAt: record.recorded_at,
+      accuracyM: typeof record.accuracy_m === "number" ? record.accuracy_m : null,
+      lat: typeof record.lat === "number" ? record.lat : null,
+      lng: typeof record.lng === "number" ? record.lng : null,
+      lotLat: config.lat,
+      lotLng: config.lng,
+    });
+    const result = applyApproach(id, assessment, config);
+    if (!result.order) {
+      res.status(404).json({ error: "Order not found.", live_gps_verified: false });
+      return;
+    }
+    res.json({
+      applied: result.applied,
+      refired: false,
+      live_gps_verified: false,
+      code: result.code,
+      note: result.note,
+      https_required_for_device_gps: true,
+      order: result.order,
+    });
+  });
+
+  app.post("/api/orders/:id/arrival-watch", (req, res) => {
+    const id = req.params.id;
+    if (!id) {
+      res.status(404).json({ error: "Order not found." });
+      return;
+    }
+    const enabled = req.body !== null && typeof req.body === "object" && (req.body as { enabled?: unknown }).enabled === true;
+    const order = setArrivalWatch(id, enabled);
+    if (!order) {
+      res.status(404).json({ error: "Order not found." });
+      return;
+    }
+    if (order.status !== "confirmed" && order.arrival_opt_in !== enabled) {
+      res.status(409).json({ error: "Close-arrival watch can change only before the grill starts.", order });
+      return;
+    }
+    res.json({ order, live_gps_verified: false });
+  });
+
+  app.post("/api/orders/:id/hold", requireKitchen, (req, res) => {
+    const id = req.params.id;
+    if (!id) {
+      res.status(404).json({ error: "Order not found." });
+      return;
+    }
+    const held = !(req.body !== null && typeof req.body === "object" && (req.body as { held?: unknown }).held === false);
+    const result = setFireHold(id, held);
+    if (!result.order) {
+      res.status(404).json({ error: "Order not found." });
+      return;
+    }
+    if (!result.changed && result.order.status !== "confirmed") {
+      res.status(409).json({ error: "Only a waiting ticket can be held or released.", order: result.order });
+      return;
+    }
+    res.json({ order: result.order, changed: result.changed });
+  });
+
+  app.post("/api/orders/:id/start", requireKitchen, (req, res) => {
+    const id = req.params.id;
+    if (!id) {
+      res.status(404).json({ error: "Order not found." });
+      return;
+    }
+    const result = staffStart(id);
+    if (!result.order) {
+      res.status(404).json({ error: "Order not found." });
+      return;
+    }
+    if (!result.changed && result.order.status === "confirmed") {
+      res.status(409).json({ error: result.note, order: result.order });
+      return;
+    }
+    res.json({ order: result.order, changed: result.changed });
+  });
+
+  app.post("/api/orders/:id/demo-payment", requireKitchen, (req, res) => {
+    const id = req.params.id;
+    if (!id) {
+      res.status(404).json({ error: "Order not found." });
+      return;
+    }
+    const result = markDemoPayment(id);
+    if (!result.order) {
+      res.status(404).json({ error: "Order not found." });
+      return;
+    }
+    if (result.error) {
+      res.status(409).json({ error: result.error, order: result.order });
+      return;
+    }
+    res.json({ order: result.order, changed: result.changed, live_charge: false });
+  });
+
   app.post("/api/orders/:id/here", (req, res) => {
     const id = req.params.id;
     if (!id) {
@@ -243,6 +371,17 @@ export function createApp(): express.Express {
     const order = markHere(id);
     if (!order) {
       res.status(404).json({ error: "Order not found." });
+      return;
+    }
+    if (order.fire_hold && order.status === "confirmed") {
+      res.status(409).json({ error: "Kitchen staff are holding this fire. The stall check-in did not start cooking.", order });
+      return;
+    }
+    if (order.status === "confirmed" && order.guest_here) {
+      res.status(409).json({
+        error: "Your arrival was recorded, but the kitchen is at capacity. Staff must free a grill slot before this ticket can start.",
+        order,
+      });
       return;
     }
     if (order.status === "completed" || order.status === "no_show") {
@@ -319,5 +458,6 @@ if (isDirectRun()) {
   app.listen(config.port, config.host, () => {
     console.log(`${config.driveIn} listening on http://${config.host}:${config.port}`);
   });
-  setInterval(() => kitchenBoard(loadConfig()), 5_000).unref();
+  // Due scheduled fires move to cooking while this process is up. Ready stays a staff action.
+  setInterval(() => promoteDueFires(), 5_000).unref();
 }

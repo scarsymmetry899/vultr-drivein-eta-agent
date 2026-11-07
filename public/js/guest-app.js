@@ -1,3 +1,4 @@
+import { arrivalSlotLabel } from "./arrival-label.js";
 import { presentIsoClocks, serviceFootnote } from "./clocks.js";
 import { foodMark } from "./icons.js";
 
@@ -447,6 +448,7 @@ function arrivalPanel() {
     button.type = "button";
     button.setAttribute("role", "radio");
     button.setAttribute("aria-checked", on ? "true" : "false");
+    button.textContent = arrivalSlotLabel(slot);
     button.setAttribute("aria-label", `${shortLocal(slot)} ${dayLabel(slot)}`);
     button.addEventListener("click", () => {
       state.draft.eta = slot.toISOString();
@@ -672,6 +674,8 @@ function reviewView() {
   }
   orderCard.append(lines, lineRow("Food", usd(subtotalCents()), "total-row"));
   orderCard.append(el("p", "fine", "Sales tax is calculated by the pit. Pay at the window. We do not take a card in this demo."));
+  orderCard.append(payChoice());
+  orderCard.append(watchChoice());
 
   const carCard = el("section", "review-card");
   carCard.append(el("h2", "", "Pulling in"));
@@ -732,6 +736,8 @@ async function submitOrder(notes) {
         car_model: (state.draft.model || "").trim(),
         eta: new Date(state.draft.eta).toISOString(),
         notes,
+        arrival_opt_in: state.draft.arrivalOptIn === true,
+        payment: state.draft.payment || "pay_at_window",
         items: state.cart.lines.map((line) => ({ sku: line.sku, qty: line.qty })),
       }),
     });
@@ -936,6 +942,14 @@ function stepsCard(order) {
   }
   card.append(list);
   card.append(el("p", "fine", nextStep(order)));
+  if (order.status === "confirmed" && order.fire_hold) {
+    card.append(el("p", "fine", "Kitchen staff are holding the fire. Staff must release it or deliberately start cooking."));
+  } else if (
+    order.status === "confirmed" &&
+    ((order.kitchen_start_at && Date.parse(order.kitchen_start_at) <= Date.now()) || order.guest_here)
+  ) {
+    card.append(el("p", "fine", "The scheduled fire is due and cooking has not started. It starts when a grill slot is free."));
+  }
   if (state.notice) card.append(el("p", "fine", state.notice));
 
   const open = order.status !== "completed" && order.status !== "no_show";
@@ -958,7 +972,155 @@ function stepsCard(order) {
     card.append(el("div", "here-bar", "Car is at the stall"));
   }
   if (order.status === "completed") card.append(el("p", "fine", "This ticket was picked up."));
+  card.append(el("p", "fine", order.payment_label || "Pay at the window. No card is stored."));
+  card.append(arrivalWatch(order));
   return card;
+}
+
+function payChoice() {
+  const box = el("fieldset", "stack");
+  const legend = el("legend", "field-label", "Payment");
+  box.append(legend);
+  box.append(payRadio("pay_at_window", "Pay at the window"));
+  box.append(payRadio("demo_unpaid", "Demo marker only: unpaid. Not a card charge."));
+  return box;
+}
+
+function payRadio(value, label) {
+  const row = el("label", "field");
+  const input = document.createElement("input");
+  input.type = "radio";
+  input.name = "payment";
+  input.value = value;
+  input.checked = (state.draft.payment || "pay_at_window") === value;
+  input.addEventListener("change", () => {
+    state.draft.payment = value;
+    saveJson("route66-draft", state.draft);
+  });
+  row.append(input, document.createTextNode(` ${label}`));
+  return row;
+}
+
+function watchChoice() {
+  const row = el("label", "field");
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.checked = state.draft.arrivalOptIn === true;
+  input.addEventListener("change", () => {
+    state.draft.arrivalOptIn = input.checked;
+    saveJson("route66-draft", state.draft);
+  });
+  row.append(input, document.createTextNode(" Optional: start earlier if a close arrival is reported. Off leaves the scheduled fire."));
+  return row;
+}
+
+function arrivalWatch(order) {
+  const box = el("section", "trail");
+  box.append(el("h2", "", "Close arrival"));
+  const secure = window.isSecureContext;
+  box.append(el("p", "fine", secure
+    ? "This browser can ask for a location. A reading is browser-reported, not a verified live GPS fix. You can turn watching off."
+    : "This page is not a secure context, so the browser will not share GPS. The public demo is HTTP on an IP address. Device location needs HTTPS on a hostname. Use I'm at the stall, or a labeled simulation."));
+  if (order.status !== "confirmed") {
+    box.append(el("p", "fine", "The grill has started. Another arrival report will not move the clock."));
+    return box;
+  }
+  if (!order.arrival_opt_in) {
+    box.append(el("p", "fine", "Close-arrival watch is off. The scheduled fire and I'm at the stall still work."));
+    if (order.status === "confirmed") box.append(watchButton(order, true, "Turn on close-arrival watch"));
+    return box;
+  }
+  box.append(el("p", "fine", "Watch is on. A close report can start cooking once. Another report will not move the clock."));
+  if (order.status === "confirmed" && !order.fire_hold) {
+    const close = el("button", "btn btn-dark btn-wide", "Simulate a close arrival (demo)");
+    close.type = "button";
+    close.addEventListener("click", () => sendApproach("sim-close"));
+    const far = el("button", "btn btn-dark btn-wide", "Simulate a far arrival (demo)");
+    far.type = "button";
+    far.addEventListener("click", () => sendApproach("sim-far"));
+    box.append(close, far);
+    if (secure) {
+      const device = el("button", "btn btn-dark btn-wide", "Use this browser's location");
+      device.type = "button";
+      device.addEventListener("click", () => requestDeviceFix());
+      box.append(device);
+    }
+  }
+  if (order.fire_hold) box.append(el("p", "fine", "Kitchen staff are holding the fire. Arrival reports will not start it."));
+  if (order.status === "confirmed") box.append(watchButton(order, false, "Stop close-arrival watch"));
+  return box;
+}
+
+function watchButton(order, enabled, label) {
+  const button = el("button", "btn btn-dark btn-wide", label);
+  button.type = "button";
+  button.addEventListener("click", async () => {
+    const response = await fetch(`/api/orders/${order.id}/arrival-watch`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    });
+    const body = await response.json();
+    if (!response.ok) {
+      state.error = body.error || "Could not change close-arrival watch.";
+    } else {
+      state.order = body.order;
+      state.error = "";
+    }
+    render();
+  });
+  return button;
+}
+
+async function sendApproach(source, extra = {}) {
+  if (state.busy) return;
+  state.busy = true;
+  state.busyAction = "approach";
+  state.error = "";
+  state.notice = source === "device"
+    ? "Sending a browser-reported location. It is not a verified live GPS fix."
+    : "Sending a labeled simulation. This does not use device GPS.";
+  render();
+  try {
+    const response = await fetch(`/api/orders/${state.ticketId}/approach`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ source, recorded_at: new Date().toISOString(), ...extra }),
+    });
+    const body = await response.json();
+    if (body.order) state.order = body.order;
+    if (!response.ok) throw new Error(body.error || "The arrival report was refused.");
+    state.notice = body.note || "";
+  } catch (error) {
+    state.error = error instanceof Error ? error.message : "The arrival report was refused.";
+    state.notice = "";
+  } finally {
+    state.busy = false;
+    state.busyAction = "";
+    render();
+  }
+}
+
+function requestDeviceFix() {
+  if (!window.isSecureContext || !navigator.geolocation) {
+    state.error = "Device location is unavailable. HTTPS on a hostname is required. Use the labeled simulation or I'm at the stall.";
+    render();
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      sendApproach("device", {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        accuracy_m: position.coords.accuracy,
+      });
+    },
+    () => {
+      state.error = "The browser did not share a location. Nothing was stored. The scheduled fire is unchanged.";
+      render();
+    },
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 8000 },
+  );
 }
 
 function decisionPanel(order) {
@@ -1363,13 +1525,20 @@ function lotZone() {
 }
 
 function hoursRange() {
-  const [openH, openM] = (state.menu?.open || "11:00").split(":").map(Number);
-  const [closeH, closeM] = (state.menu?.close || "22:00").split(":").map(Number);
+  const open = state.menu?.open || "00:00";
+  const close = state.menu?.close || "24:00";
+  const [openH, openM] = open.split(":").map(Number);
+  const [closeH, closeM] = close.split(":").map(Number);
   return [openH * 60 + openM, closeH * 60 + closeM];
 }
 
+function alwaysOpen() {
+  return (state.menu?.open || "00:00") === "00:00" && (state.menu?.close || "24:00") === "24:00";
+}
+
 function hoursLabel() {
-  return `${plainClock(state.menu?.open || "11:00")}–${plainClock(state.menu?.close || "22:00")} Austin time`;
+  if (alwaysOpen()) return "24 hours, Austin time";
+  return `${plainClock(state.menu?.open || "00:00")}–${plainClock(state.menu?.close || "24:00")} Austin time`;
 }
 
 function plainClock(hhmm) {
@@ -1393,6 +1562,7 @@ function austinMinutes(date) {
 }
 
 function outsideAustinHours(date) {
+  if (alwaysOpen()) return false;
   const [open, close] = hoursRange();
   const minutes = austinMinutes(date);
   return minutes < open || minutes > close;

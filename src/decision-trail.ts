@@ -81,6 +81,7 @@ export function trailForEarlyArrival(input: {
   fireAt: string;
   readyBy: string;
   timeZone?: string;
+  kind?: "stall" | "approach";
 }): DecisionTrail {
   const at = (iso: string) =>
     new Intl.DateTimeFormat("en-US", {
@@ -90,9 +91,12 @@ export function trailForEarlyArrival(input: {
       timeZoneName: "short",
     }).format(new Date(iso));
   const changes: string[] = [];
+  const approach = input.kind === "approach";
   if (input.previousFire) {
     changes.push(
-      `You arrived before the grill was scheduled to start. You checked in at ${at(input.fireAt)}, ahead of the planned fire at ${at(input.previousFire)}. Cooking started at check-in.`,
+      approach
+        ? `A close arrival was accepted at ${at(input.fireAt)}, ahead of the planned fire at ${at(input.previousFire)}. Cooking started then. The car was not marked at the stall.`
+        : `You arrived before the grill was scheduled to start. You checked in at ${at(input.fireAt)}, ahead of the planned fire at ${at(input.previousFire)}. Cooking started at check-in.`,
     );
     changes.push(
       `The earlier fire time was replaced: fire ${at(input.previousFire)} → ${at(input.fireAt)}` +
@@ -123,7 +127,9 @@ export function trailForEarlyArrival(input: {
         actor: "guest",
         step: "check_in",
         result: "done",
-        note: "Checked in early. The check-in rule moved the fire time. Kitchen staff now own the bag.",
+        note: approach
+          ? "Close arrival started the grill once. This did not mark the car at the stall."
+          : "Checked in early. The check-in rule moved the fire time. Kitchen staff now own the bag.",
       },
     ],
     explanation: {

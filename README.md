@@ -15,7 +15,8 @@ The operator reported the VM update at 13:45:56 IST on 7 Nov 2026. The sanitized
 - The previous process had accepted `deepseek-v4.1-flash-1017` at `2026-11-06T19:23:01.701Z` for ticket `R66-23873` (00:53 IST on 7 Nov 2026; Austin tiles 1:49 PM and 1:57 PM CST). That flag died with the restart. The current footer should not name a live reply until the next accepted one.
 - An earlier ticket, `R66-17299`, accepted the same model at `2026-11-06T17:59:23.023Z`. That sentence still showed UTC. A restart cleared that check.
 - LabLab project page: [route66](https://lablab.build/ai-hackathons/vultr-hackathon/route66). One member. Enrolled. Discord joined. Online was chosen. A form field was not saved. No video, no slide deck, and no final submission have been sent.
-- Ready and picked up on this restarted board were not clicked. The merged unit test says a due fire starts cooking and a passed `ready_by` stays with staff. That click is not a VM recording.
+- An authenticated API test on the process this restart replaced, ticket `R66-23873`, went confirmed, stall check-in `200` cooking, ready `200`, picked up `200` completed. The early check-in moved fire from 1:49 PM CST to 1:42 PM CST and ready from 1:57 PM CST to 1:50 PM CST. A ready call on a still-confirmed ticket returned `409`. The kitchen board was `200` with the token and `401` without it. A second pickup on `R66-17299` returned `409`. The full live action log was truncated. Overdue bags, late cars, and a staff hold were not part of that test. It is not a recording of the process that started at 13:45:56 IST.
+- Ready and picked up on this restarted board were not clicked. The code on the VM starts a due fire and leaves a passed `ready_by` with staff. That rule is a unit test, not a new VM click. This pull request is not what the VM is serving.
 
 Nothing here is a real restaurant, a real order, a payment, a labor saving, or an enterprise rollout. Do not commit customer data, phone numbers, or API keys. License is MIT. The Hyderabad adaptation is disclosed in [`docs/SOURCE.md`](docs/SOURCE.md).
 
@@ -52,8 +53,12 @@ The service steps are rules:
 1. The guest builds the ticket.
 2. The solver sets fire and ready.
 3. An early check-in re-times a future fire. A second check-in does not move the clock.
-4. Kitchen staff mark the bag ready.
+4. Kitchen staff mark the bag ready. A due ready time does not do that by itself.
 5. Kitchen staff mark it picked up.
+
+A guest can opt in to an earlier start. The first credible close arrival, a labeled simulation, or a browser-reported reading can start cooking before the scheduled fire. A repeated report does not move the clock. Staff can hold the scheduled fire. A guest schedule or a close reading does not clear that hold. Releasing a hold on a fire that is already due starts cooking and returns the started ticket. A full grill, including a ticket that is still cooking after its ready time, keeps the next due ticket waiting until staff mark a bag ready. Staff can start a held ticket only when a slot is free, and a full grill leaves the hold in place. Passing the ready time does not mark the bag ready. Coordinates are not stored. A latitude or longitude outside the real range is rejected. The public demo is HTTP on an IP address, so the browser will not provide GPS. Device location needs HTTPS on a hostname. Live GPS is not verified. Pay at the window stays the default. A demo marker can say unpaid or marked, and neither is a charge. The enterprise and processor path is [`docs/ROADMAP.md`](docs/ROADMAP.md).
+
+Suggested GitHub About text, which this environment cannot set: "Fictional Austin drive-in service counter for Vultr Agent Rush Challenge 2 (Future of Work). The solver times the grill. Optional Vultr inference only writes the sentence. Kitchen staff finish the bag."
 
 Exceptions stay visible. A closed-hours arrival is refused. A sold-out item is refused. If Docker cannot run the solver, the API returns 503 and does not invent a fire time. An overdue bag or a late car stays on the board until a person acts.
 
@@ -102,7 +107,7 @@ npm test
 npm run dev
 ```
 
-Open `http://localhost:8080` for the guest page and `http://localhost:8080/kitchen.html` for the board. The demo window is 11:00–22:00 America/Chicago. An arrival outside that window is refused when you schedule.
+Open `http://localhost:8080` for the guest page and `http://localhost:8080/kitchen.html` for the board. The default lot is open 24 hours in America/Chicago, including midnight and both sides of a daylight-saving change. A past arrival is still refused. The deployed VM keeps whatever `DRIVEIN_OPEN` and `DRIVEIN_CLOSE` are in its `.env`. Those were `11:00` and `22:00` when the machine was first installed. This code does not change that file.
 
 ```bash
 npm run sandbox:solve

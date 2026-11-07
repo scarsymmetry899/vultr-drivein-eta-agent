@@ -121,6 +121,18 @@ function renderCard(card, now) {
       ["Arrive", short(card.eta_timestamp), ""],
       ["Fire", card.kitchen_start_at ? short(card.kitchen_start_at) : "not timed", "red"],
     ]));
+    const hold = node("button", "pit-btn dark", card.fire_hold ? "Release the fire" : "Hold the fire");
+    hold.type = "button";
+    hold.addEventListener("click", () => postHold(card, hold));
+    article.append(hold);
+    const start = node("button", "pit-btn", "Start now (release hold)");
+    start.type = "button";
+    start.addEventListener("click", () => {
+      if (window.confirm("Start cooking now? This deliberately releases the hold. Kitchen capacity still applies.")) {
+        postStatus(card.id, "start", start);
+      }
+    });
+    article.append(start);
   } else if (card.status === "cooking") {
     const start = card.kitchen_start_at ? Date.parse(card.kitchen_start_at) : now.getTime();
     const end = card.ready_by ? Date.parse(card.ready_by) : start;
@@ -139,7 +151,7 @@ function renderCard(card, now) {
       ["Ready by", short(card.ready_by), "green"],
     ]);
     if (card.fire_moved_from) {
-      const moved = node("span", "moved", "Rush fire at check-in · planned ");
+      const moved = node("span", "moved", card.guest_here ? "Rush fire at check-in · planned " : "Early fire · planned ");
       moved.append(node("strong", "", short(card.fire_moved_from)));
       times.append(moved);
     }
@@ -158,6 +170,7 @@ function renderCard(card, now) {
     button.addEventListener("click", () => postStatus(card.id, "picked-up", button));
     article.append(button);
   }
+  if (card.payment_label) article.append(node("p", "tc-owner", card.payment_label));
   if (card.next_step) article.append(node("p", "tc-owner", card.next_step));
   if (card.exception) article.append(node("p", "tc-note", card.exception));
   if (card.last_action) article.append(node("p", "tc-owner", presentIsoClocks(card.last_action, timeZone)));
@@ -174,6 +187,25 @@ function renderLane(key, cards, now, emptyText) {
   for (const card of cards) lanes[key].append(renderCard(card, now));
 }
 
+async function postHold(card, button) {
+  if (button.disabled) return;
+  button.disabled = true;
+  try {
+    const response = await kitchenFetch(`/api/orders/${card.id}/hold`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ held: !card.fire_hold }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) statusLine.textContent = body.error || "The hold was refused.";
+    await refresh();
+    if (!response.ok) statusLine.textContent = body.error || "The hold was refused.";
+  } catch {
+    statusLine.textContent = "The board could not reach the server. The hold was not confirmed.";
+    button.disabled = false;
+  }
+}
+
 async function postStatus(id, action, button) {
   if (button.disabled) return;
   const original = button.textContent;
@@ -188,7 +220,7 @@ async function postStatus(id, action, button) {
       refused = body.error || "That status change was refused.";
     }
   } catch {
-    statusLine.textContent = "The board could not reach the server. The change was not confirmed.";
+    setStatus("The board could not reach the server. The change was not confirmed.", 8000);
     button.disabled = false;
     button.textContent = original;
     button.removeAttribute("aria-busy");
@@ -197,25 +229,25 @@ async function postStatus(id, action, button) {
   try {
     await refresh();
   } catch {
-    statusLine.textContent = refused || "The change was sent, and the board did not reload.";
+    setStatus(refused || "The change was sent, and the board did not reload.", 8000);
     return;
   }
-  if (refused) statusLine.textContent = refused;
+  if (refused) setStatus(refused, 8000);
 }
 
 async function refresh() {
   if (!sessionStorage.getItem("route66-kitchen-token")) {
     showBoard(false);
-    statusLine.textContent = "The board is locked until you enter the kitchen token.";
+    setStatus("The board is locked until you enter the kitchen token.");
     return;
   }
   try {
     const response = await kitchenFetch("/api/kitchen/board");
     if (response.status === 401 || response.status === 503) {
       showBoard(false);
-      statusLine.textContent = response.status === 503
+      setStatus(response.status === 503
         ? "Kitchen access is not configured on this server."
-        : "That token was refused.";
+        : "That token was refused.");
       return;
     }
     if (!response.ok) throw new Error("The board did not load.");
@@ -230,10 +262,19 @@ async function refresh() {
     renderLane("ready", data.ready, now, "Nothing bagged.");
     if (typeof data.picked_up_today === "number") $("#chip-done").textContent = String(data.picked_up_today);
     if (Array.isArray(data.sandbox_flags)) renderFlags(data.sandbox_flags);
-    statusLine.textContent = `${data.drive_in} · ${data.waiting.length} waiting · ${data.firing.length} firing · ${data.ready.length} ready`;
+    if (Date.now() > statusUntil) {
+      setStatus(`${data.drive_in} · ${data.waiting.length} waiting · ${data.firing.length} firing · ${data.ready.length} ready`);
+    }
   } catch (error) {
-    statusLine.textContent = error instanceof Error ? error.message : "The board is unavailable.";
+    setStatus(error instanceof Error ? error.message : "The board is unavailable.");
   }
+}
+
+let statusUntil = 0;
+
+function setStatus(text, stickyMs = 0) {
+  statusLine.textContent = text;
+  statusUntil = stickyMs ? Date.now() + stickyMs : 0;
 }
 
 let flagsKey = "";

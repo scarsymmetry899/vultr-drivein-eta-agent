@@ -3,7 +3,9 @@ import { parseTrail, trailForEarlyArrival } from "./decision-trail.ts";
 import type { DecisionTrail } from "./decision-trail.ts";
 import { serviceCue, withAction } from "./service-log.ts";
 import type { ServiceAction } from "./service-log.ts";
-import { ticketPrepMinutes } from "../sandbox/fire-time-solver/solver.ts";
+import { describeArrivalHours, ticketPrepMinutes } from "../sandbox/fire-time-solver/solver.ts";
+import type { ArrivalAssessment } from "./arrival.ts";
+import { paymentLabel, staffDemoMark, type PaymentState } from "./payment.ts";
 import { openDatabase } from "./db.ts";
 import { loadConfig, type AppConfig } from "./config.ts";
 import type { DriveInOrder, NewOrderInput, OrderItem, OrderStatus, UnavailableItem } from "./types.ts";
@@ -33,6 +35,9 @@ interface OrderRow {
   arrived_at: string | null;
   schedule_reason: string | null;
   decision_trail: string | null;
+  fire_hold: number;
+  arrival_opt_in: number;
+  payment_state: PaymentState;
   created_at: string;
   updated_at: string;
 }
@@ -40,7 +45,8 @@ interface OrderRow {
 const ORDER_SELECT = `SELECT id, order_number, customer_name, car_plate, car_model, car_color, items,
   special_notes, eta_time, eta_timestamp, kitchen_start_at, ready_by, prep_minutes, buffer_minutes,
   subtotal_cents, sales_tax_cents, grand_total_cents, currency, status, order_type, guest_here,
-  arrived_at, schedule_reason, decision_trail, created_at, updated_at FROM drivein_orders`;
+  arrived_at, schedule_reason, decision_trail, fire_hold, arrival_opt_in, payment_state,
+  created_at, updated_at FROM drivein_orders`;
 
 export function listUnavailable(): UnavailableItem[] {
   const rows = openDatabase()
@@ -99,6 +105,10 @@ export function createOrder(input: NewOrderInput): DriveInOrder {
       arrived_at: null,
       schedule_reason: null,
       decision_trail: null,
+      fire_hold: false,
+      arrival_opt_in: input.arrival_opt_in,
+      payment_state: input.payment_state,
+      payment_label: paymentLabel(input.payment_state),
       created_at: now,
       updated_at: now,
     };
@@ -108,8 +118,8 @@ export function createOrder(input: NewOrderInput): DriveInOrder {
           id, order_number, customer_name, car_plate, car_model, car_color, items, special_notes,
           eta_time, eta_timestamp, kitchen_start_at, ready_by, prep_minutes, buffer_minutes,
           subtotal_cents, sales_tax_cents, grand_total_cents, currency, status, order_type,
-          guest_here, arrived_at, schedule_reason, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?, ?, 'USD', 'confirmed', ?, 0, NULL, NULL, ?, ?)`,
+          guest_here, arrived_at, schedule_reason, fire_hold, arrival_opt_in, payment_state, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?, ?, 'USD', 'confirmed', ?, 0, NULL, NULL, 0, ?, ?, ?, ?)`,
       ).run(
         order.id,
         order.order_number,
@@ -125,6 +135,8 @@ export function createOrder(input: NewOrderInput): DriveInOrder {
         order.sales_tax_cents,
         order.grand_total_cents,
         order.order_type,
+        order.arrival_opt_in ? 1 : 0,
+        order.payment_state,
         order.created_at,
         order.updated_at,
       );
@@ -138,12 +150,18 @@ export function createOrder(input: NewOrderInput): DriveInOrder {
   throw new Error("Could not mint an order number.");
 }
 
-export function getOrder(id: string): DriveInOrder | undefined {
+function readOrder(id: string): DriveInOrder | undefined {
   const row = openDatabase().prepare(`${ORDER_SELECT} WHERE id = ?`).get(id) as OrderRow | undefined;
   return row ? fromRow(row) : undefined;
 }
 
+export function getOrder(id: string): DriveInOrder | undefined {
+  promoteDueFires();
+  return readOrder(id);
+}
+
 export function findOrder(orderNumber: string, carPlate: string): DriveInOrder | undefined {
+  promoteDueFires();
   const row = openDatabase()
     .prepare(`${ORDER_SELECT} WHERE order_number = ? AND car_plate = ?`)
     .get(orderNumber, carPlate) as OrderRow | undefined;
@@ -151,17 +169,44 @@ export function findOrder(orderNumber: string, carPlate: string): DriveInOrder |
 }
 
 /**
- * Due fires move to cooking. Passing ready_by does not mark the bag ready.
- * Kitchen staff do that. Picked up stays a staff action too.
+ * Due scheduled fires move to cooking unless staff are holding the ticket
+ * or the grill is already full. Passing ready_by does not mark the bag ready.
+ * The long-running server calls this every few seconds. A read of one ticket does too.
  */
-export function promote(now = new Date()): void {
-  const db = openDatabase();
+export function promoteDueFires(now = new Date()): string[] {
   const stamp = now.toISOString();
-  db.prepare(
-    `UPDATE drivein_orders
-     SET status = 'cooking', updated_at = ?
-     WHERE status = 'confirmed' AND kitchen_start_at IS NOT NULL AND kitchen_start_at <= ?`,
-  ).run(stamp, stamp);
+  const due = openDatabase()
+    .prepare(
+      `SELECT id, kitchen_start_at FROM drivein_orders
+       WHERE status = 'confirmed' AND fire_hold = 0
+         AND kitchen_start_at IS NOT NULL AND kitchen_start_at <= ?
+       ORDER BY kitchen_start_at, created_at, id`,
+    )
+    .all(stamp) as { id: string; kitchen_start_at: string }[];
+  const started: string[] = [];
+  for (const row of due) {
+    if (cookingCount() >= loadConfig().capacity) break;
+    const result = openDatabase()
+      .prepare(
+        `UPDATE drivein_orders SET status = 'cooking', updated_at = ?
+         WHERE id = ? AND status = 'confirmed' AND fire_hold = 0
+           AND kitchen_start_at IS NOT NULL AND kitchen_start_at <= ?`,
+      )
+      .run(stamp, row.id, stamp);
+    if (Number(result.changes) !== 1) continue;
+    const late = now.getTime() - Date.parse(row.kitchen_start_at) > 5_000;
+    remember(row.id, {
+      at: stamp,
+      actor: "solver",
+      step: "auto_fire",
+      result: "done",
+      note: late
+        ? "Cooking started later than planned. The displayed fire and ready-by times are the original estimates, not a readiness promise. Staff must reassess timing and mark the bag ready."
+        : "The scheduled fire time arrived. Cooking started. Kitchen staff still mark the bag ready.",
+    });
+    started.push(row.id);
+  }
+  return started;
 }
 
 export function activeFireWindows(exceptId?: string): { fire_at: string; ready_by: string }[] {
@@ -204,7 +249,7 @@ export function applySchedule(
       patch.buffer_minutes,
       patch.reason,
       patch.decision_trail,
-      patch.status,
+      "confirmed",
       stamp,
       id,
     );
@@ -230,9 +275,17 @@ export function markHere(id: string): DriveInOrder | undefined {
   const existing = getOrder(id);
   if (!existing) return undefined;
   if (existing.status === "completed" || existing.status === "no_show") return existing;
+  if (existing.fire_hold && existing.status === "confirmed") return existing;
   const now = new Date();
   const stamp = now.toISOString();
   const db = openDatabase();
+  if (existing.status === "confirmed" && cookingCount() >= loadConfig().capacity) {
+    db.prepare(
+      `UPDATE drivein_orders SET guest_here = 1, arrived_at = COALESCE(arrived_at, ?),
+        schedule_reason = ?, updated_at = ? WHERE id = ? AND status = 'confirmed'`,
+    ).run(stamp, "The kitchen is at capacity. Staff must free a grill slot before this ticket can start.", stamp, id);
+    return readOrder(id);
+  }
   if (existing.status === "confirmed") {
     const prep = existing.prep_minutes ?? ticketPrepMinutes(existing.items);
     const ready = new Date(now.getTime() + prep * 60_000).toISOString();
@@ -280,6 +333,216 @@ export function markHere(id: string): DriveInOrder | undefined {
   return getOrder(id);
 }
 
+export interface ApproachResult {
+  order: DriveInOrder | undefined;
+  applied: boolean;
+  refired: boolean;
+  code: string;
+  note: string;
+}
+
+/** Opt-in close arrival. A repeated report never moves a fire that already started. */
+export function applyApproach(id: string, assessment: ArrivalAssessment, config: AppConfig, now = new Date()): ApproachResult {
+  const existing = getOrder(id);
+  if (!existing) return { order: undefined, applied: false, refired: false, code: "missing", note: "Order not found." };
+  if (!existing.arrival_opt_in) {
+    return {
+      order: existing,
+      applied: false,
+      refired: false,
+      code: "opt-out",
+      note: "Close-arrival watch is off. The scheduled fire still stands, or use I'm at the stall.",
+    };
+  }
+  if (existing.status === "cooking" || existing.status === "ready" || existing.status === "completed") {
+    return {
+      order: existing,
+      applied: false,
+      refired: false,
+      code: "already-started",
+      note: "The grill already started. Another arrival report did not move the fire time.",
+    };
+  }
+  if (existing.fire_hold) {
+    return {
+      order: existing,
+      applied: false,
+      refired: false,
+      code: "held",
+      note: "Kitchen staff are holding this fire. The arrival report did not start cooking.",
+    };
+  }
+  if (!assessment.credible) {
+    return { order: existing, applied: false, refired: false, code: assessment.code, note: assessment.note };
+  }
+  const hours = describeArrivalHours(now, config.open, config.close, config.timezone);
+  if (!hours.ok) {
+    return {
+      order: existing,
+      applied: false,
+      refired: false,
+      code: "closed",
+      note: "The lot is closed, so a close arrival did not start the grill. The scheduled fire was left in place.",
+    };
+  }
+  if (cookingCount() >= config.capacity) {
+    return {
+      order: existing,
+      applied: false,
+      refired: false,
+      code: "full",
+      note: "The kitchen is at capacity. Early fire was not started. The scheduled time still stands.",
+    };
+  }
+  const started = rushFire(existing, now, {
+    actor: "guest",
+    step: "approach",
+    note: assessment.note,
+  });
+  return {
+    order: started.order,
+    applied: started.changed,
+    refired: false,
+    code: started.changed ? assessment.code : "unchanged",
+    note: started.changed ? assessment.note : "The fire time stayed where it was.",
+  };
+}
+
+export function setArrivalWatch(id: string, enabled: boolean): DriveInOrder | undefined {
+  const stamp = new Date().toISOString();
+  openDatabase()
+    .prepare(`UPDATE drivein_orders SET arrival_opt_in = ?, updated_at = ? WHERE id = ? AND status = 'confirmed'`)
+    .run(enabled ? 1 : 0, stamp, id);
+  return getOrder(id);
+}
+
+export function setFireHold(id: string, held: boolean): { order: DriveInOrder | undefined; changed: boolean } {
+  const existing = getOrder(id);
+  if (!existing) return { order: undefined, changed: false };
+  if (existing.status !== "confirmed") return { order: existing, changed: false };
+  const stamp = new Date().toISOString();
+  const result = openDatabase()
+    .prepare(`UPDATE drivein_orders SET fire_hold = ?, updated_at = ? WHERE id = ? AND status = 'confirmed'`)
+    .run(held ? 1 : 0, stamp, id);
+  const changed = Number(result.changes) === 1 && existing.fire_hold !== held;
+  if (changed) {
+    remember(id, {
+      at: stamp,
+      actor: "kitchen",
+      step: "hold",
+      result: held ? "done" : "unchanged",
+      note: held
+        ? "Kitchen staff held the scheduled fire. It will not start until they release it."
+        : "Kitchen staff released the hold. The scheduled fire can start when it is due.",
+    });
+  }
+  return { order: getOrder(id), changed };
+}
+
+export function markDemoPayment(id: string): { order: DriveInOrder | undefined; changed: boolean; error?: string } {
+  const existing = getOrder(id);
+  if (!existing) return { order: undefined, changed: false, error: "Order not found." };
+  const next = staffDemoMark(existing.payment_state);
+  if (typeof next !== "string") return { order: existing, changed: false, error: next.error };
+  if (next === existing.payment_state) return { order: existing, changed: false };
+  const stamp = new Date().toISOString();
+  openDatabase()
+    .prepare(`UPDATE drivein_orders SET payment_state = ?, updated_at = ? WHERE id = ?`)
+    .run(next, stamp, id);
+  remember(id, {
+    at: stamp,
+    actor: "kitchen",
+    step: "payment",
+    result: "done",
+    note: "Marked the demo payment adapter. This is not a charge.",
+  });
+  return { order: getOrder(id), changed: true };
+}
+
+export function staffStart(id: string): { order: DriveInOrder | undefined; changed: boolean; note: string } {
+  const existing = getOrder(id);
+  if (!existing) return { order: undefined, changed: false, note: "Order not found." };
+  if (existing.status !== "confirmed") {
+    return { order: existing, changed: false, note: "The grill has already moved on." };
+  }
+  if (cookingCount() >= loadConfig().capacity) {
+    return {
+      order: existing,
+      changed: false,
+      note: "The kitchen is at capacity. Mark a finished bag ready before starting this ticket. The hold was left unchanged.",
+    };
+  }
+  openDatabase().prepare(`UPDATE drivein_orders SET fire_hold = 0, updated_at = ? WHERE id = ? AND status = 'confirmed'`).run(new Date().toISOString(), id);
+  const open = readOrder(id);
+  if (!open) return { order: undefined, changed: false, note: "Order not found." };
+  const started = rushFire({ ...open, fire_hold: false }, new Date(), {
+    actor: "kitchen",
+    step: "check_in",
+    note: "Kitchen staff started the fire. A hold does not block this.",
+  });
+  return {
+    order: started.order,
+    changed: started.changed,
+    note: started.changed ? "Kitchen staff started the fire." : "The fire time stayed where it was.",
+  };
+}
+
+function cookingCount(): number {
+  const row = openDatabase().prepare(`SELECT COUNT(*) AS n FROM drivein_orders WHERE status = 'cooking'`).get() as { n: number };
+  return Number(row.n);
+}
+
+function rushFire(
+  existing: DriveInOrder,
+  now: Date,
+  action: { actor: "guest" | "kitchen"; step: "check_in" | "approach"; note: string },
+): { order: DriveInOrder | undefined; changed: boolean } {
+  const stamp = now.toISOString();
+  const prep = existing.prep_minutes ?? ticketPrepMinutes(existing.items);
+  const ready = new Date(now.getTime() + prep * 60_000).toISOString();
+  const atStall = action.step === "check_in" && action.actor === "guest";
+  const result = openDatabase()
+    .prepare(
+      `UPDATE drivein_orders
+       SET guest_here = ?, arrived_at = CASE WHEN ? = 1 THEN ? ELSE arrived_at END,
+           prep_minutes = ?, kitchen_start_at = ?, ready_by = ?,
+           status = 'cooking', order_type = 'now', schedule_reason = ?, decision_trail = ?, fire_hold = 0, updated_at = ?
+       WHERE id = ? AND status = 'confirmed' AND fire_hold = 0`,
+    )
+    .run(
+      atStall ? 1 : existing.guest_here ? 1 : 0,
+      atStall ? 1 : 0,
+      stamp,
+      prep,
+      stamp,
+      ready,
+      action.note,
+      JSON.stringify(
+        trailForEarlyArrival({
+          arrival: existing.eta_time,
+          previousFire: existing.kitchen_start_at,
+          previousReady: existing.ready_by,
+          prepMinutes: prep,
+          fireAt: stamp,
+          readyBy: ready,
+          timeZone: loadConfig().timezone,
+          kind: action.step === "approach" ? "approach" : "stall",
+        }),
+      ),
+      stamp,
+      existing.id,
+    );
+  if (Number(result.changes) !== 1) return { order: getOrder(existing.id), changed: false };
+  remember(existing.id, {
+    at: stamp,
+    actor: action.actor,
+    step: action.step,
+    result: "done",
+    note: action.note,
+  });
+  return { order: getOrder(existing.id), changed: true };
+}
+
 export function markReady(id: string): { order: DriveInOrder | undefined; changed: boolean } {
   const stamp = new Date().toISOString();
   const result = openDatabase()
@@ -321,7 +584,7 @@ export function markPickedUp(id: string): { order: DriveInOrder | undefined; cha
 }
 
 function remember(id: string, action: ServiceAction): void {
-  const order = getOrder(id);
+  const order = readOrder(id);
   if (!order) return;
   const trail = withAction(order.decision_trail ?? blankTrail(order), action);
   openDatabase().prepare("UPDATE drivein_orders SET decision_trail = ? WHERE id = ?").run(JSON.stringify(trail), id);
@@ -373,6 +636,8 @@ export interface BoardCard {
   next_step: string;
   exception: string | null;
   last_action: string | null;
+  fire_hold: boolean;
+  payment_label: string;
 }
 
 export function kitchenBoard(config: AppConfig, now = new Date()): {
@@ -385,7 +650,7 @@ export function kitchenBoard(config: AppConfig, now = new Date()): {
   picked_up_today: number;
   sandbox_flags: string[];
 } {
-  promote(now);
+  promoteDueFires(now);
   const rows = openDatabase()
     .prepare(`${ORDER_SELECT} WHERE status IN ('confirmed', 'cooking', 'ready')`)
     .all() as unknown as OrderRow[];
@@ -444,6 +709,7 @@ function toCard(order: DriveInOrder, now: Date): BoardCard {
     ready_by: order.ready_by,
     eta_timestamp: order.eta_timestamp,
     now,
+    fire_hold: order.fire_hold,
   });
   const actions = order.decision_trail?.actions ?? [];
   return {
@@ -469,6 +735,8 @@ function toCard(order: DriveInOrder, now: Date): BoardCard {
     next_step: cue.next_step,
     exception: cue.exception,
     last_action: actions.length ? actions[actions.length - 1]?.note ?? null : null,
+    fire_hold: order.fire_hold,
+    payment_label: order.payment_label,
   };
 }
 
@@ -498,6 +766,10 @@ function fromRow(row: OrderRow): DriveInOrder {
     guest_here: row.guest_here === 1,
     arrived_at: row.arrived_at,
     schedule_reason: row.schedule_reason,
+    fire_hold: row.fire_hold === 1,
+    arrival_opt_in: row.arrival_opt_in === 1,
+    payment_state: row.payment_state,
+    payment_label: paymentLabel(row.payment_state),
     decision_trail: parseTrail(row.decision_trail),
     created_at: row.created_at,
     updated_at: row.updated_at,
