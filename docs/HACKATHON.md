@@ -10,13 +10,15 @@ One spoken line: the guest sets an arrival, the solver times the grill, a person
 
 Say who owns each step. The guest times the grill and can check in early. The solver sets fire and ready. Kitchen staff mark ready and picked up. If the bag is overdue or the car is late, say that a person decides and the board will not close the ticket by itself. If the footer names a model, say that reply was accepted by this server process and clears on restart. If the footer says no reply has been accepted yet, do not call the sentence a live model. Pay is at the window. There is no card charge, no labor savings, and no real restaurant.
 
-A video has not been recorded. A slide deck has not been made. A final submission has not been sent. The staff ready and picked-up path on the deployed board is being tested separately and is not confirmed here.
+A video has not been recorded. A slide deck has not been made. A final submission has not been sent. Ready and picked up were not clicked on the process that started at 13:45:56 IST on 7 Nov 2026.
 
 ## Observed live reply
 
-The operator reports the VM is serving commit `3bdfb827e00e01f4ac3de68efb077a3e0facd6fc`. After a restart, Time the grill on ticket `R66-23873` at 00:53 IST on 7 Nov 2026 returned `live_call_verified: true` for `deepseek-v4.1-flash-1017`. The Austin tiles were 1:49 PM and 1:57 PM CST. That flag is the current process. The next restart clears it.
+The operator reports the VM is serving `6704bcc5801b11b253fdfdd51d64fd24cfeae709`. At 13:45:56 IST on 7 Nov 2026, health showed `live_call_verified: false` because the restart cleared the flag. The record is [`deploy/DEPLOYED.md`](../deploy/DEPLOYED.md). Until the next accepted reply, the footer is deterministic wording.
 
-An earlier ticket, `R66-17299`, accepted the same model at `2026-11-06T17:59:23.023Z`. That sentence still contained `2026-11-06T18:19:00.000Z` and `2026-11-06T18:27:00.000Z`, while the tiles were 12:19 PM and 12:27 PM Austin. The restart cleared that check.
+The previous process accepted `deepseek-v4.1-flash-1017` for ticket `R66-23873` at 00:53 IST on 7 Nov 2026. The Austin tiles were 1:49 PM and 1:57 PM CST. That check is not this process.
+
+An earlier ticket, `R66-17299`, accepted the same model at `2026-11-06T17:59:23.023Z`. That sentence still contained `2026-11-06T18:19:00.000Z` and `2026-11-06T18:27:00.000Z`, while the tiles were 12:19 PM and 12:27 PM Austin. A restart cleared that check too.
 
 ## Hackathon account
 
@@ -37,11 +39,10 @@ It is not a restaurant, a pilot, or an autonomous kitchen. It does not take paym
 
 ## What is actually true today
 
-- Public code: this repository.
-- Operator-reported VM: `route66-drivein-demo`, `65.20.93.98`, Ubuntu 24.04, Mumbai, 1 vCPU / 2 GB, serving `3bdfb827e00e01f4ac3de68efb077a3e0facd6fc`.
-- Inference on that VM: `deepseek-v4.1-flash-1017`. Ticket `R66-23873` at 00:53 IST on 7 Nov 2026 is the post-restart accepted reply. Health shows `live_call_verified: true` only for the current process.
-- Staff path on the deployed process, authenticated API, ticket `R66-23873`: stall check-in `200` cooking, ready `200`, picked up `200` completed. Early check-in moved fire 1:49 PM CST to 1:42 PM CST and ready 1:57 PM CST to 1:50 PM CST. Ready on a confirmed ticket was `409`. Board with the token was `200` and without it `401`. A second pickup on `R66-17299` was `409`. The full live action log was truncated. Overdue, late-car, and hold behavior were not in that test.
-- Deployed commit `3bdfb827` still auto-marks ready when `ready_by` passes. The code after that leaves ready as a staff click. That code is not what the VM is serving.
+- Public code on `main`: `6704bcc5801b11b253fdfdd51d64fd24cfeae709` after pull request 14. This pull request is not merged.
+- Operator-reported VM: `route66-drivein-demo`, `65.20.93.98`, Ubuntu 24.04, Mumbai, 1 vCPU / 2 GB, serving that same SHA. Reported at 13:45:56 IST on 7 Nov 2026. Health: ok, sqlite, docker, fail-closed, inference mode live and configured, kitchen auth on, `live_call_verified: false`. Kitchen without a token: 401. Config, token, and SQLite checksums matched across the update.
+- The last accepted model reply on record is `deepseek-v4.1-flash-1017` for ticket `R66-23873` at 00:53 IST on 7 Nov 2026. It belongs to the process this restart replaced. No new model call was made for the update.
+- On that earlier process, an authenticated API test of `R66-23873` went stall check-in `200` cooking, ready `200`, picked up `200` completed. Early check-in moved fire 1:49 PM CST to 1:42 PM CST and ready 1:57 PM CST to 1:50 PM CST. Ready on a confirmed ticket was `409`. Board with the token was `200` and without it `401`. A second pickup on `R66-17299` was `409`. Overdue, late-car, and hold behavior were not in that test. Those clicks were not repeated after the 13:45:56 IST restart.
 - Containment: verified on a Docker build container on 6 Nov 2026 (probe, killed loop, Docker-down drill, real daemon stop). Re-run on the VM when recording.
 - Video, slide deck, and final submission: not sent.
 
@@ -58,7 +59,7 @@ It is not a restaurant, a pilot, or an autonomous kitchen. It does not take paym
 
 Story in one line: a guest changes plans, the agent re-times the grill, and hostile input cannot reach the restaurant.
 
-The operator reports the VM is on `3bdfb827` with `SANDBOX_RUNNER=docker`. Read the footer before you speak. If it names a model, say the reply was accepted by this process and clears on restart. If it says no reply has been accepted, say the wording is deterministic. Never show the kitchen token or the inference key. Point at the model sentence and confirm the times are Austin clock times, not raw UTC. Do not narrate the staff ready and picked-up clicks as confirmed until that deployed test is written down.
+The operator reports the VM is on `6704bcc` with `SANDBOX_RUNNER=docker` and, after the 13:45:56 IST restart, no accepted reply in this process. Read the footer before you speak. If it says no reply has been accepted, say the wording is deterministic. If a new Time the grill names a model, say that reply was accepted by this process and clears on restart. Never show the kitchen token or the inference key. Point at the model sentence and confirm the times are Austin clock times, not raw UTC. Mark ready and picked up on camera if you show them. Do not say an earlier session already proved those clicks on this process.
 
 **Beat 1 — the agent decides (about 60 s)**
 
@@ -82,7 +83,7 @@ If any step does not hold, do not narrate it as containment. Say what failed.
 
 ## Draft submission text
 
-Route 66 Drive-In is a fictional restaurant service counter for Challenge 2, Future of Work. The named focus areas are sales operations, finance and accounting, HR and recruitment, customer support, and procurement. This demo is closest to customer support: a guest ticket, a timing check, a bounded action, and a person when the bag or the car needs a decision. It is not a CRM, a ledger, a hiring desk, or a purchasing system. The control plane is a Vultr Cloud Compute VM. The guest sets an arrival in America/Chicago. The default code is open 24 hours there. The VM `.env` still has the original 11:00–22:00 until those two lines are edited on the machine. A Docker solver, started with no network, a read-only root, a non-root user, and memory, pid, and CPU limits, returns the grill fire time and the ready time. Those numbers stay on the ticket. An early check-in re-times them by rule. Kitchen staff mark the bag ready and picked up. Vultr Serverless Inference, wired only to `https://api.vultrinference.com/v1`, may supply the sentence. It is schema-checked and cannot change the fire time. After a restart, ticket R66-23873 at 00:53 IST on 7 Nov 2026 accepted deepseek-v4.1-flash-1017, with Austin tiles at 1:49 PM and 1:57 PM CST. That check is process memory and clears on the next restart. The public URL is http://65.20.93.98:8080/ on commit 3bdfb827. A video, a deck, and a final submission have not been sent. This is not a real restaurant, it does not process payments, and it does not claim labor savings or an enterprise rollout.
+Route 66 Drive-In is a fictional restaurant service counter for Challenge 2, Future of Work. The named focus areas are sales operations, finance and accounting, HR and recruitment, customer support, and procurement. This demo is closest to customer support: a guest ticket, a timing check, a bounded action, and a person when the bag or the car needs a decision. It is not a CRM, a ledger, a hiring desk, or a purchasing system. The control plane is a Vultr Cloud Compute VM. The guest sets an arrival in America/Chicago. This pull request's default hours are 00:00 through 24:00. The VM `.env` was not edited in the 13:45:56 IST update, so the live lot hours stay whatever was already in that file. A Docker solver, started with no network, a read-only root, a non-root user, and memory, pid, and CPU limits, returns the grill fire time and the ready time. Those numbers stay on the ticket. An early check-in re-times them by rule. Passing the ready time does not mark the bag ready. Kitchen staff do that, then mark it picked up. Vultr Serverless Inference, wired only to `https://api.vultrinference.com/v1`, may supply the sentence. It is schema-checked and cannot change the fire time. The public URL is http://65.20.93.98:8080/ on commit 6704bcc. At 13:45:56 IST on 7 Nov 2026 the operator reported health ok, Docker isolation, inference mode live, and live_call_verified false after the restart. An earlier process accepted deepseek-v4.1-flash-1017 for ticket R66-23873 at 00:53 IST, with Austin tiles at 1:49 PM and 1:57 PM CST. That check is not the current process. A video, a deck, and a final submission have not been sent. This is not a real restaurant, it does not process payments, and it does not claim labor savings or an enterprise rollout.
 
 Focus areas: https://lablab.ai/ai-hackathons/vultr-hackathon
 Project page: https://lablab.build/ai-hackathons/vultr-hackathon/route66
