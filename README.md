@@ -8,13 +8,14 @@ The isolated solver is the Challenge 1 boundary this service uses. The fire time
 
 ## Where the project stands
 
-Reported by the operator on 7 Nov 2026. This repo does not provision Vultr resources and has not seen the inference key.
+The operator reported the VM update at 13:45:56 IST on 7 Nov 2026. The sanitized record is [`deploy/DEPLOYED.md`](deploy/DEPLOYED.md). This repo does not provision Vultr resources and has not seen the inference key.
 
-- The VM `route66-drivein-demo` (`65.20.93.98`) is serving commit `3bdfb827e00e01f4ac3de68efb077a3e0facd6fc`.
-- After a restart, Time the grill on ticket `R66-23873` at 00:53 IST returned `live_call_verified: true` for `deepseek-v4.1-flash-1017`. The Austin tiles were 1:49 PM and 1:57 PM CST. That flag belongs to the running process. The next restart clears it until another reply is accepted.
-- An earlier ticket, `R66-17299`, accepted the same model at `2026-11-06T17:59:23.023Z`. That sentence still showed UTC. The restart cleared that check. The display fix in `3bdfb827` is what the operator reports is now deployed.
+- The VM `route66-drivein-demo` (`65.20.93.98`) is on `main` at `6704bcc5801b11b253fdfdd51d64fd24cfeae709`, the merge of pull request 14. The work tree was clean, and that SHA matched `origin/main`. The `route66` service was active after the restart.
+- Public health was ok, SQLite, Docker, fail-closed, inference mode `live`, inference configured, kitchen auth on, and `live_call_verified: false`. The kitchen board without a token was 401. The `.env` file, the kitchen token file, and the SQLite file kept the same checksums. No new model call and no new ticket were part of that check.
+- The previous process had accepted `deepseek-v4.1-flash-1017` at `2026-11-06T19:23:01.701Z` for ticket `R66-23873` (00:53 IST on 7 Nov 2026; Austin tiles 1:49 PM and 1:57 PM CST). That flag died with the restart. The current footer should not name a live reply until the next accepted one.
+- An earlier ticket, `R66-17299`, accepted the same model at `2026-11-06T17:59:23.023Z`. That sentence still showed UTC. A restart cleared that check.
 - LabLab project page: [route66](https://lablab.build/ai-hackathons/vultr-hackathon/route66). One member. Enrolled. Discord joined. Online was chosen. A form field was not saved. No video, no slide deck, and no final submission have been sent.
-- The staff path on the deployed board, ready and picked up, is being tested separately. This repository does not treat that path as confirmed.
+- Ready and picked up on this restarted board were not clicked. The merged unit test says a due fire starts cooking and a passed `ready_by` stays with staff. That click is not a VM recording.
 
 Nothing here is a real restaurant, a real order, a payment, a labor saving, or an enterprise rollout. Do not commit customer data, phone numbers, or API keys. License is MIT. The Hyderabad adaptation is disclosed in [`docs/SOURCE.md`](docs/SOURCE.md).
 
@@ -35,7 +36,7 @@ Challenge 2 asks for a Vultr VM backend and a public web app. Serverless Inferen
 | Piece | Role here |
 | --- | --- |
 | [Vultr Cloud Compute](https://www.vultr.com/products/cloud-compute/) VM | Runs this Express app. The VM is the control plane: it takes the order, calls inference, and dispatches the solver. **Not created by this repo.** |
-| [Vultr Serverless Inference](https://docs.vultr.com/vultr-inference-api) | Optional. OpenAI-compatible chat at `https://api.vultrinference.com/v1` only. The code does not send the key to another host. Used only when `INFERENCE_MODE=live` and both the key and model are set. Output must match a JSON schema, is length-limited, and is display copy only. ISO timestamps inside that sentence are shown in Austin time. The stored solver timestamps stay ISO. The current process on the VM accepted `deepseek-v4.1-flash-1017` for ticket `R66-23873` after a restart. The next restart clears that check. |
+| [Vultr Serverless Inference](https://docs.vultr.com/vultr-inference-api) | Optional. OpenAI-compatible chat at `https://api.vultrinference.com/v1` only. The code does not send the key to another host. Used only when `INFERENCE_MODE=live` and both the key and model are set. Output must match a JSON schema, is length-limited, and is display copy only. ISO timestamps inside that sentence are shown in Austin time. The stored solver timestamps stay ISO. The process restarted at 13:45:56 IST on 7 Nov 2026 reports `live_call_verified: false`. The last accepted reply on record, `deepseek-v4.1-flash-1017` for ticket `R66-23873`, belongs to the process that restart replaced. |
 | Docker sandbox | `sandbox/Dockerfile` runs the solver and `containment-probe.mjs`. The API's docker argv drops capabilities, uses `--network=none`, a read-only root, a non-root user, memory, pid, and CPU caps, and a stdout cap. The image has no secrets. |
 
 The numbers on the board come from the solver. The model does not propose the fire time. A sandboxed browser is not this product.
@@ -66,7 +67,7 @@ What is in this codebase:
 - Orders in SQLite (`db/sqlite.sql`), so a restart keeps the board.
 - Deploy recipe in [`deploy/RUNBOOK.md`](deploy/RUNBOOK.md) and the safe update in [`deploy/UPDATE.md`](deploy/UPDATE.md).
 
-The public URL is `http://65.20.93.98:8080/`. The operator reports it is serving `3bdfb827e00e01f4ac3de68efb077a3e0facd6fc`. A video has not been recorded. Vultr GPUs are not part of the event and are not used here.
+The public URL is `http://65.20.93.98:8080/`. The operator reports it is serving `6704bcc5801b11b253fdfdd51d64fd24cfeae709`. A video has not been recorded. Vultr GPUs are not part of the event and are not used here.
 
 ## How this differs from ONE Drive-in
 
@@ -129,7 +130,7 @@ Then set `SANDBOX_RUNNER=docker` in `.env` if the API should dispatch into that 
 
 ## Deploy on the existing Vultr VM
 
-The machine `route66-drivein-demo` at `65.20.93.98` is the operator's VM. Do not run `browser-console.sh` again. After a later commit is on `main`, use [`deploy/UPDATE.md`](deploy/UPDATE.md). That update keeps `.env`, the kitchen token, Docker mode, the inference key, and the SQLite file. Startup adds a `decision_trail` column if the existing file does not have one. It does not wipe orders. Health reports `live_call_verified: true` only after this server process got a live Vultr reply that passed the schema. It goes back to `false` on restart until the next live reply. The guest footer follows that process. It names the model after an accepted reply, and it does not claim a reply this process has not accepted.
+The machine `route66-drivein-demo` at `65.20.93.98` is the operator's VM. Do not run `browser-console.sh` again. After a later commit is on `main`, use [`deploy/UPDATE.md`](deploy/UPDATE.md). The update reported at 13:45:56 IST on 7 Nov 2026 is [`deploy/DEPLOYED.md`](deploy/DEPLOYED.md). That update keeps `.env`, the kitchen token, Docker mode, the inference key, and the SQLite file. Startup adds a `decision_trail` column if the existing file does not have one. It does not wipe orders. Health reports `live_call_verified: true` only after this server process got a live Vultr reply that passed the schema. It goes back to `false` on restart until the next live reply. The guest footer follows that process. It names the model after an accepted reply, and it does not claim a reply this process has not accepted.
 
 The guest app is separate screens: menu by category, item, bag, checkout (arrival, vehicle, review), and a ticket with a live fire clock. Under 960px it is a phone layout with a tab bar. At 960px and up it has a sidebar, a bag rail on the menu, and checkout arrival and vehicle side by side. The kitchen is a staff board. There is no account and no card charge.
 
@@ -158,7 +159,7 @@ See [`.env.example`](.env.example). Inference URL, key, and model are blank on p
 
 `npm test` covers the solver (including daylight time), SQLite orders and status transitions, Austin hours, kitchen auth, demo inference that does not call the network, a live call that is forced to `https://api.vultrinference.com/v1` even if another base URL is set, hostile and HTTP-failed model text that does not replace the solver sentence, the decision trail for a normal schedule and an early check-in, and a Docker runner that fails closed when the daemon is missing.
 
-Tests also cover the early check-in trail with both clocks, the Docker-down drill, the json_schema retry, `live_call_verified` turning true only after an accepted live reply, Austin wording for the UTC sentence returned on ticket `R66-17299`, the footer for a verified reply and for live mode with no reply yet, and kitchen attribution for ready and picked up. The solver `fire_at` in that test stays `2026-11-06T18:19:00.000Z`.
+Tests also cover the early check-in trail with both clocks, the Docker-down drill, the json_schema retry, `live_call_verified` turning true only after an accepted live reply, Austin wording for the UTC sentence returned on ticket `R66-17299`, the footer for a verified reply and for live mode with no reply yet, and kitchen attribution for ready and picked up. A ticket whose fire time and ready time are already past stays `cooking` across two board reads. It does not move to ready by itself. The solver `fire_at` in the Austin-wording test stays `2026-11-06T18:19:00.000Z`. On that tree, `npm test` was 49 passed and `tsc --noEmit` passed. Those commands were not re-run on the VM.
 
 On 6 Nov 2026, in a cloud build container with Docker 29.9.2 (not the VM), `bash scripts/containment-demo.sh` returned `verified: true`: uid 1000, network `ENETUNREACH`, `/etc` and `/sandbox` writes `EROFS`, `/etc/shadow` `EACCES`, no inference key, spin loop exit 137. The app on `SANDBOX_RUNNER=docker` scheduled a ticket in the container, the kitchen probe reported `boundaries_held: true`, the Docker-down drill returned 503 with nothing scheduled, and with the daemon actually stopped a schedule returned 503 and the ticket stayed `confirmed`. That run is not evidence for `65.20.93.98`.
 

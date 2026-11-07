@@ -2,7 +2,7 @@
 
 The VM `route66-drivein-demo` (`65.20.93.98`) already exists. Do not create another one from this repo. Do not re-run [`browser-console.sh`](browser-console.sh). It rewrites `.env`. Updates go through [`UPDATE.md`](UPDATE.md).
 
-The operator reports that VM is serving commit `3bdfb827e00e01f4ac3de68efb077a3e0facd6fc`, with live inference wording on model `deepseek-v4.1-flash-1017`. `live_call_verified` is true only after an accepted reply in the current process. The install steps below are the original recipe, not a second install.
+The operator reports that VM is serving `6704bcc5801b11b253fdfdd51d64fd24cfeae709` after the 13:45:56 IST update on 7 Nov 2026. Inference mode stayed `live`. `live_call_verified` is false until this process accepts another reply. The record is [`DEPLOYED.md`](DEPLOYED.md). The install steps below are the original recipe, not a second install.
 
 The steps below are the same install, spelled out. The script is the one to paste.
 
