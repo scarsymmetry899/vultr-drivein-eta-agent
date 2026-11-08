@@ -1,6 +1,6 @@
 # Verified release — 7 November 2026
 
-PR [#13](https://github.com/scarsymmetry899/vultr-drivein-eta-agent/pull/13) was merged and application commit `65ca138a54f41a7ba394de4b5abb749bcc57c594` deployed to the existing `route66-drivein-demo` VM (`65.20.93.98`). Public app: http://65.20.93.98:8080/.
+PR [#13](https://github.com/scarsymmetry899/vultr-drivein-eta-agent/pull/13) was merged and application commit `65ca138a54f41a7ba394de4b5abb749bcc57c594` deployed to the existing `route66-drivein-demo` VM (`65.20.93.98`). The original public app used port 8080. Current public app: https://route66-drivein-demo.duckdns.org/ (HTTPS added 8 November; public 8080 closed).
 
 ## Deployment evidence
 
@@ -23,6 +23,6 @@ These were authenticated localhost API checks on the VM, not browser clicks or v
 
 ## Submission status
 
-As of 8 November, the six-slide PDF is complete. The actual demo video has not been recorded, LabLab fields have not been saved, and final submission has not been sent. Current deadline and requirements still need verification. Final entry remains subject to user review before submission.
+Current submission status is maintained in [`READINESS.md`](READINESS.md). The 8 November check confirmed the official deadline as 23:00 UTC (9 November 04:30 IST), a saved basic draft at 57%, and the attached six-slide PDF. Video and remaining technical fields are pending. Final entry remains subject to user review before submission.
 
 No real GPS, real payment, enterprise rollout, fresh VM containment probe, or demo recording is claimed. Earlier containment probes were on build machines. If shown on video, run and record the actual VM probe and narrate only its observed result. No extra paid resource was provisioned.

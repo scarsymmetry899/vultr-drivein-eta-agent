@@ -4,18 +4,19 @@ A fictional Austin drive-in. A guest opens a ticket with an arrival time and a p
 
 This repository is the Challenge 2 entry for [Vultr Agent Rush](https://lablab.ai/ai-hackathons/vultr-hackathon), **Future of Work**. The event names five focus areas: sales operations, finance and accounting, HR and recruitment, customer support, and procurement ([event page](https://lablab.ai/ai-hackathons/vultr-hackathon)). This demo is a restaurant service counter. The nearest named area is customer support: a ticket is opened, the timing is checked, a bounded action is taken, and a person is required when the bag or the car needs a decision. It is not a CRM, a ledger, a hiring desk, or a purchasing system.
 
-The isolated solver is the Challenge 1 boundary this service uses. The fire time and the ready time come from that solver. The model is optional wording.
+The isolated solver adds a containment boundary to this Challenge 2 workflow. The fire time and the ready time come from that solver. The model is optional wording.
 
 ## Where the project stands
 
-The existing VM was backed up and updated on **7 November 2026**. Full sanitized evidence: [`deploy/DEPLOYED.md`](deploy/DEPLOYED.md). Current checklist: [`deploy/READINESS.md`](deploy/READINESS.md).
+Public demo: **[Open Route 66 Drive-In](https://route66-drivein-demo.duckdns.org/)**. HTTPS was verified on 8 November. The existing VM was backed up and updated on **7 November 2026**. Full sanitized evidence: [`deploy/DEPLOYED.md`](deploy/DEPLOYED.md). Current checklist: [`deploy/READINESS.md`](deploy/READINESS.md).
 
-- PR [#13](https://github.com/scarsymmetry899/vultr-drivein-eta-agent/pull/13) is merged. Deployed application: `65ca138a54f41a7ba394de4b5abb749bcc57c594` on `route66-drivein-demo` (`65.20.93.98`), restarted at 10:56:46 UTC.
+- PR [#13](https://github.com/scarsymmetry899/vultr-drivein-eta-agent/pull/13) is merged. Last VM-recorded application release: `65ca138a54f41a7ba394de4b5abb749bcc57c594` on `route66-drivein-demo` (`65.20.93.98`), restarted at 10:56:46 UTC.
 - Root-only database/configuration backup passed integrity checking. Three existing orders survived migration. Kitchen token was unchanged; only service hours changed to `00:00`–`24:00` in Austin.
 - Dependency installation, typecheck, and **72 tests** passed on the VM after the hours change. Docker solver was rebuilt.
 - Authenticated localhost API checks verified scheduling, staff hold, labeled close-arrival simulation, hold release, ready, and pickup. Held check-in and repeated pickup returned 409. Completed fictional ticket `R66-12515` remains as evidence. These checks are not a browser recording.
 - Health reported SQLite, Docker, fail-closed, live/configured inference, and kitchen authentication. Unauthenticated board returned 401. A schema-accepted `deepseek-v4.1-flash-1017` reply at `2026-11-07T11:03:21.133Z` set process-local inference verification true; restart clears it.
-- Submission status on 8 November: six-slide PDF complete; actual demo video not recorded; LabLab fields not saved; deadline/requirements still need verification; final submission not sent and requires user review.
+- Submission check on 8 November at 15:50 UTC: six-slide PDF complete and attached; LabLab draft shows 57% with basic fields saved. Video and remaining technical fields are pending. Deadline is 8 November 23:00 UTC (9 November 04:30 IST). Final submission has not been sent and requires user review. See [`deploy/READINESS.md`](deploy/READINESS.md).
+- Current public health on 8 November reports SQLite, Docker isolation, fail-closed scheduling, and kitchen authentication. It reports an accepted `deepseek-v4.1-flash-1017` response at `2026-11-08T13:58:26.460Z`; this process-local flag clears on restart. HTTPS access details: [`deploy/ACCESS.md`](deploy/ACCESS.md).
 
 Nothing here is a real restaurant, a real order, a payment, a labor saving, or an enterprise rollout. Do not commit customer data, phone numbers, or API keys. License is MIT. The Hyderabad adaptation is disclosed in [`docs/SOURCE.md`](docs/SOURCE.md).
 
@@ -31,7 +32,7 @@ The sample solver ticket is a Classic Burger, fries, and a chocolate shake for a
 
 ## Vultr stack
 
-Challenge 2 asks for a Vultr VM backend and a public web app. Serverless Inference is optional. This app uses the VM for the service workflow. Inference, when live, only supplies the sentence. Challenge 1's sandbox is how the solver runs.
+Challenge 2 asks for a Vultr VM backend and a public web app. Serverless Inference is optional. This app uses the VM for the service workflow. Inference, when live, only supplies the sentence. A Docker sandbox isolates the solver.
 
 | Piece | Role here |
 | --- | --- |
@@ -55,9 +56,9 @@ The service steps are rules:
 4. Kitchen staff mark the bag ready. A due ready time does not do that by itself.
 5. Kitchen staff mark it picked up.
 
-A guest can opt in to an earlier start. The first credible close arrival, a labeled simulation, or a browser-reported reading can start cooking before the scheduled fire. A repeated report does not move the clock. Staff can hold the scheduled fire. A guest schedule or a close reading does not clear that hold. Releasing a hold on a fire that is already due starts cooking and returns the started ticket. A full grill, including a ticket that is still cooking after its ready time, keeps the next due ticket waiting until staff mark a bag ready. Staff can start a held ticket only when a slot is free, and a full grill leaves the hold in place. Passing the ready time does not mark the bag ready. Coordinates are not stored. A latitude or longitude outside the real range is rejected. The public demo is HTTP on an IP address, so the browser will not provide GPS. Device location needs HTTPS on a hostname. Live GPS is not verified. Pay at the window stays the default. A demo marker can say unpaid or marked, and neither is a charge. The enterprise and processor path is [`docs/ROADMAP.md`](docs/ROADMAP.md).
+A guest can opt in to an earlier start. The first credible close arrival, a labeled simulation, or a browser-reported reading can start cooking before the scheduled fire. A repeated report does not move the clock. Staff can hold the scheduled fire. A guest schedule or a close reading does not clear that hold. Releasing a hold on a fire that is already due starts cooking and returns the started ticket. A full grill, including a ticket that is still cooking after its ready time, keeps the next due ticket waiting until staff mark a bag ready. Staff can start a held ticket only when a slot is free, and a full grill leaves the hold in place. Passing the ready time does not mark the bag ready. Coordinates are not stored. A latitude or longitude outside the real range is rejected. The public demo now has HTTPS on a hostname. This satisfies the secure-origin prerequisite for browser location, but live GPS behavior remains unverified and still needs device permission and testing. Pay at the window stays the default. A demo marker can say unpaid or marked, and neither is a charge. The enterprise and processor path is [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
-Proposed GitHub About description (pending repository-settings access): "Fictional Austin drive-in service counter for Vultr Agent Rush Challenge 2 (Future of Work). The solver times the grill. Optional Vultr inference only writes the sentence. Kitchen staff finish the bag."
+GitHub About description, verified on 8 November: "Fictional Austin drive-in service counter for Vultr Agent Rush Challenge 2 (Future of Work). The solver times the grill. Optional Vultr inference only writes the sentence. Kitchen staff finish the bag."
 
 Exceptions stay visible. A closed-hours arrival is refused. A sold-out item is refused. If Docker cannot run the solver, the API returns 503 and does not invent a fire time. An overdue bag or a late car stays on the board until a person acts.
 
@@ -71,13 +72,13 @@ What is in this codebase:
 - Orders in SQLite (`db/sqlite.sql`), so a restart keeps the board.
 - Deploy recipe in [`deploy/RUNBOOK.md`](deploy/RUNBOOK.md) and the safe update in [`deploy/UPDATE.md`](deploy/UPDATE.md).
 
-The public URL is `http://65.20.93.98:8080/`. The verified application release is `65ca138a54f41a7ba394de4b5abb749bcc57c594`. A video has not been recorded. Vultr GPUs are not part of the event and are not used here.
+The public URL is [https://route66-drivein-demo.duckdns.org/](https://route66-drivein-demo.duckdns.org/). Public port 8080 is closed; use HTTPS. The last VM-recorded application release is `65ca138a54f41a7ba394de4b5abb749bcc57c594`. Public health does not expose a commit hash, so the 8 November browser check does not establish the current VM checkout. See [`deploy/READINESS.md`](deploy/READINESS.md) for artifact status. Vultr GPUs are not part of the event and are not used here.
 
 ## How this differs from ONE Drive-in
 
 The domain ideas — an ETA, a plate, a single orders table, a kitchen start time, and an 86 list — come from the Hyderabad ONE Drive-in project `onedrivein-ordernow-preorder`. The seed snapshot has been removed from the current tree at the user’s request; it was not executed by the Route 66 app. Earlier Git history still contains it. Full table of what moved and what stayed behind: [`docs/SOURCE.md`](docs/SOURCE.md).
 
-In short, the US scaffold uses USD cents and sales tax, one Austin menu, a web kitchen board, and a sandbox that computes `fire_at`. It does not depend on Make.com, Telegram, Razorpay, GST, Jubilee Hills counters, or Supabase edge functions. Arrival is the guest tapping **I'm at the stall**, not a GPS watch.
+In short, the US scaffold uses USD cents and sales tax, one Austin menu, a web kitchen board, and a sandbox that computes `fire_at`. It does not depend on Make.com, Telegram, Razorpay, GST, Jubilee Hills counters, or Supabase edge functions. Verified arrival paths are the guest tapping **I'm at the stall** and a labeled simulation; live GPS remains unverified.
 
 ## Layout
 
