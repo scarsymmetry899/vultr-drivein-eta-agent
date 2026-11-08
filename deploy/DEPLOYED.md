@@ -1,34 +1,28 @@
-# Deployment record — 7 Nov 2026
+# Verified release — 7 November 2026
 
-The operator updated the existing VM `route66-drivein-demo` (`65.20.93.98`) over SSH with [`UPDATE.md`](UPDATE.md). This note is that report. It is not a second install, a LabLab submission, or a check repeated from this repository. Checksums, the kitchen token, the inference key, and ticket rows are not copied here.
+PR [#13](https://github.com/scarsymmetry899/vultr-drivein-eta-agent/pull/13) was merged and application commit `65ca138a54f41a7ba394de4b5abb749bcc57c594` deployed to the existing `route66-drivein-demo` VM (`65.20.93.98`). Public app: http://65.20.93.98:8080/.
 
-## Code already on `main`
+## Deployment evidence
 
-[Pull request 14](https://github.com/scarsymmetry899/vultr-drivein-eta-agent/pull/14) merged as `6704bcc5801b11b253fdfdd51d64fd24cfeae709`. Parents: `40bfec3f71318c2e2b8060d44342800cf9308290` and `e82305581b38dd30c8769402821f97da461728de`.
+- Root-only SQLite/configuration backup completed at 10:53:15 UTC; SQLite integrity check passed. Three existing orders were backed up and preserved after migration.
+- Clean checkout fast-forwarded from `6704bcc5801b11b253fdfdd51d64fd24cfeae709` to the released application SHA.
+- Dependency installation and typecheck passed on the VM. Initial tests with legacy 11:00–22:00 hours had 70 passes and two hours-related failures. After the requested 00:00–24:00 configuration change, all **72 tests passed**, zero failed.
+- Docker solver image rebuilt, production dependencies installed, service restarted successfully at **10:56:46 UTC**.
+- Configuration changed only in `DRIVEIN_OPEN=00:00` and `DRIVEIN_CLOSE=24:00`. Kitchen token remained byte-identical. Configuration remained mode 600, owned by route66; private backup directory remained root-only, mode 700. Checkout was clean.
 
-On that tree, a due fire still moves a waiting ticket to cooking. Passing `ready_by` does not mark the bag ready. `npm test` on that tree was 49 passed, and `tsc --noEmit` passed. Those commands were not re-run on the VM. [Pull request 13](https://github.com/scarsymmetry899/vultr-drivein-eta-agent/pull/13) was not merged.
+## Live API evidence
 
-## What the operator reported at 13:45:56 IST
+These were authenticated localhost API checks on the VM, not browser clicks or video footage.
 
-- `/opt/route66` was on `main` with a clean work tree.
-- `HEAD` was `6704bcc5801b11b253fdfdd51d64fd24cfeae709`, the same commit as `origin/main`.
-- The `route66` systemd unit was active after the restart.
-- Public health at `http://65.20.93.98:8080/api/health` was `ok: true`, persistence `sqlite`, isolation `docker`, `fail_closed: true`, `inference_mode: live`, inference configured, `kitchen_auth: true`, and `live_call_verified: false`.
-- The kitchen board without a token returned 401.
-- The `.env` file, the kitchen token file, and the SQLite file had the same checksums before and after the update.
+- All three existing order IDs survived. Migration columns `decision_trail`, `fire_hold`, `arrival_opt_in`, and `payment_state` were present.
+- Health reported ok, SQLite persistence, Docker isolation, fail-closed scheduling, live/configured inference, and kitchen authentication. Unauthenticated kitchen board returned 401.
+- Fictional ticket `R66-12515` was created for an overnight Austin arrival. A staff hold prevented scheduling and a labeled close-arrival simulation from starting cooking. Stall check-in while held returned 409.
+- After hold release, labeled close-arrival simulation started cooking. `live_gps_verified` remained false.
+- Staff ready and pickup reached completed; repeated pickup returned 409. Completed test ticket remains as evidence.
+- Fresh schema-accepted inference from `deepseek-v4.1-flash-1017` at `2026-11-07T11:03:21.133Z` set `live_call_verified=true`. This flag is process-local and resets on restart.
 
-No new inference call was made for this update. No fictional ticket was scheduled after the restart, so the ready and picked-up clicks were not exercised on this process. The unit test for “past `ready_by` stays cooking” is in the merged code. It is not a VM recording.
+## Submission status
 
-## Inference on this process
+As of 8 November, the six-slide PDF is complete. The actual demo video has not been recorded, LabLab fields have not been saved, and final submission has not been sent. Current deadline and requirements still need verification. Final entry remains subject to user review before submission.
 
-`live_call_verified: false` is what the restart does. The last accepted reply this repository has a record of is model `deepseek-v4.1-flash-1017` at `2026-11-06T19:23:01.701Z`, from the process the restart replaced. Ticket `R66-23873` at 00:53 IST on 7 Nov 2026, with Austin tiles at 1:49 PM and 1:57 PM CST, belongs to that earlier process. The guest footer on the current process should say that no reply has been accepted yet until someone taps **Time the grill** and the reply passes the schema.
-
-An older ticket, `R66-17299`, accepted the same model at `2026-11-06T17:59:23.023Z`. That sentence still showed UTC. A later restart cleared it. It is not the current process either.
-
-## Still not in this repository
-
-- A demo video.
-- A slide deck.
-- A LabLab submission. The project page is https://lablab.build/ai-hackathons/vultr-hackathon/route66.
-- A containment probe run on `65.20.93.98` after this update. Earlier probes were on other machines. See the README.
-- A post-restart ticket that shows staff marking the bag ready and picked up.
+No real GPS, real payment, enterprise rollout, fresh VM containment probe, or demo recording is claimed. Earlier containment probes were on build machines. If shown on video, run and record the actual VM probe and narrate only its observed result. No extra paid resource was provisioned.

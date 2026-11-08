@@ -4,13 +4,9 @@ Domain, schema, and scheduler ideas in this repo started from the private
 project [onedrivein-ordernow-preorder](https://github.com/scarsymmetry899/onedrivein-ordernow-preorder)
 (ONE Drive-in, Jubilee Hills, Hyderabad).
 
-The copy used here is the attached seed archive, preserved unchanged under
-[`reference/one-drivein/`](../reference/one-drivein/). That private GitHub
-repository was not modified. This environment could not read the live private
-repo, so the archive is the snapshot of record.
+The original adaptation used an attached seed archive. At the user's request, the `reference/one-drivein/` snapshot has been removed from the current tree. This ordinary Git deletion does not erase earlier commits: the snapshot remains accessible in repository history. No history rewrite was performed. The private source repository was not modified.
 
-The US app does not run those Supabase functions. They stay in the tree so a
-reviewer can see what was ported.
+This disclosure preserves the source lineage; removal is not a claim of independent origin or a determination of publication rights. The Route 66 app does not run the removed Supabase functions.
 
 ## Adapted
 
@@ -32,7 +28,7 @@ The original timer rule — start cooking when `kitchen_start_at` is due, even i
 
 ## Left in the Hyderabad seed
 
-These stay in `reference/one-drivein/` and are not dependencies of the US app.
+These belonged to the removed reference snapshot and are not dependencies of the US app.
 
 - **Make.com** as the 15-minute cron. The seed's `make/README.md` describes two scenarios. The blueprint JSON files it names were not in the archive. The US scaffold has no Make.com webhook.
 - **Telegram as the kitchen display** and as the guest's confirmation channel, including inline "collected" buttons. The US kitchen is `public/kitchen.html`.
