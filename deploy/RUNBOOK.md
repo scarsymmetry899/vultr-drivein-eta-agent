@@ -2,7 +2,7 @@
 
 The VM `route66-drivein-demo` (`65.20.93.98`) already exists. Do not create another one from this repo. Do not re-run [`browser-console.sh`](browser-console.sh). It rewrites `.env`. Updates go through [`UPDATE.md`](UPDATE.md).
 
-The operator reports that VM is serving `6704bcc5801b11b253fdfdd51d64fd24cfeae709` after the 13:45:56 IST update on 7 Nov 2026. Inference mode stayed `live`. `live_call_verified` is false until this process accepts another reply. The record is [`DEPLOYED.md`](DEPLOYED.md). The install steps below are the original recipe, not a second install.
+The last VM-recorded application release is `65ca138a54f41a7ba394de4b5abb749bcc57c594`, restarted at 10:56:46 UTC on 7 November. Public health on 8 November reports live inference verified by a response accepted at `2026-11-08T13:58:26.460Z`; restart clears that verification. The record is [`DEPLOYED.md`](DEPLOYED.md). The install steps below are the original recipe, not a second install.
 
 The steps below are the same install, spelled out. The script is the one to paste.
 
@@ -40,7 +40,7 @@ Health: `curl -fsS http://127.0.0.1:8080/api/health`
 
 Expect `"ok": true`, `"persistence": "sqlite"`, `"isolation": "docker"`, `"fail_closed": true`, and `"inference_mode": "demo"` until you deliberately switch to live.
 
-Put a public URL in front of port 8080 only when you are ready to submit. This repo does not do that step.
+The existing VM already has a public HTTPS proxy at https://route66-drivein-demo.duckdns.org/. Caddy forwards to localhost port 8080; public 8080 is closed. Preserve this setup and use [`ACCESS.md`](ACCESS.md) for the verified access record. The install recipe above does not recreate that HTTPS setup.
 
 ## Containment check on the VM
 

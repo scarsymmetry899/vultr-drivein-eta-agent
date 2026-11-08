@@ -77,7 +77,7 @@ If step 4 fails, leave `INFERENCE_MODE=demo`. A failed or rejected reply never c
 
 After the service is healthy, record containment on the VM with `bash /opt/route66/scripts/containment-demo.sh` and keep the new `evidence/runs/*.json`. That file is the per-run evidence. A laptop run is not the VM.
 
-Guest: `http://65.20.93.98:8080/`
-Kitchen: `http://65.20.93.98:8080/kitchen.html` with the existing token in `/root/route66-kitchen-token.txt`.
+Guest: `https://route66-drivein-demo.duckdns.org/`
+Kitchen: `https://route66-drivein-demo.duckdns.org/kitchen.html` with the existing token in `/root/route66-kitchen-token.txt`.
 
-The operator reported that this update had been run, and that `HEAD` was `6704bcc5801b11b253fdfdd51d64fd24cfeae709`, at 13:45:56 IST on 7 Nov 2026. See [`DEPLOYED.md`](DEPLOYED.md). Do not paste the block again unless a later commit is on `main`.
+The last VM-recorded application release is `65ca138a54f41a7ba394de4b5abb749bcc57c594`, restarted at 10:56:46 UTC on 7 November. See [`DEPLOYED.md`](DEPLOYED.md). HTTPS now proxies to localhost port 8080; the public port is closed. Preserve Caddy and firewall settings described in [`ACCESS.md`](ACCESS.md). Do not paste the block again unless a later commit is on `main`.
